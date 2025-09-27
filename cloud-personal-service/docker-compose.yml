@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  cloud-personal-service:
+    build: .
+    ports:
+      - "8003:8003"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DB_PATH=/data/cloud_personal.db
+      - FILES_ROOT=/data/files
+      - DEFAULT_LLM=anthropic
+      - REMINDER_CHECK_MINUTES=5
+      - DAILY_REVIEW_HOUR=8
+      - TIMEZONE=UTC
+      - LOG_LEVEL=INFO
+    volumes:
+      - cloud_data:/data
+      - ./files:/data/files
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  cloud_data:
+    driver: local
