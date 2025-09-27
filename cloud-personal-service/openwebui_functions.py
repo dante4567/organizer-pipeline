@@ -423,3 +423,153 @@ def parse_complex_intent(text: str):
             return f"❌ Failed to parse intent: {response.status_code}"
     except Exception as e:
         return f"❌ Error: {str(e)}"
+
+def sync_todoist_tasks():
+    """
+    Sync all Todoist tasks to the local database.
+
+    Fetches all tasks from Todoist and stores them locally with metadata
+    for unified task management across platforms.
+    """
+    import requests
+
+    try:
+        response = requests.post(
+            "http://localhost:8003/todoist/sync",
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            sync_data = result['result']
+
+            output = f"🔄 **Todoist Sync Complete**\\n\\n"
+            output += f"✅ **Synced**: {sync_data['synced_tasks']} new tasks\\n"
+            output += f"📊 **Total**: {sync_data['total_todoist_tasks']} Todoist tasks\\n"
+            output += f"⏰ **Completed**: {sync_data['timestamp'][:19].replace('T', ' ')}\\n\\n"
+
+            if sync_data['synced_tasks'] > 0:
+                output += f"💡 **Tip**: Use `get_intelligent_daily_summary()` to see your updated task overview\\n"
+
+            return output
+        else:
+            return f"❌ Sync failed: {response.status_code}"
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+def get_todoist_projects():
+    """
+    Get all Todoist projects with summary information.
+
+    Retrieves the complete list of your Todoist projects for better
+    organization and project-specific task management.
+    """
+    import requests
+
+    try:
+        response = requests.get(
+            "http://localhost:8003/todoist/projects",
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            projects = result['projects']
+
+            output = f"📁 **Todoist Projects** ({len(projects)} total)\\n\\n"
+
+            # Show favorites first
+            favorites = [p for p in projects if p.get('is_favorite')]
+            if favorites:
+                output += "⭐ **Favorites**:\\n"
+                for project in favorites[:5]:
+                    output += f"• **{project['name']}** ({project['color']})\\n"
+                output += "\\n"
+
+            # Show inbox
+            inbox = [p for p in projects if p.get('is_inbox_project')]
+            if inbox:
+                output += "📥 **Inbox**:\\n"
+                for project in inbox:
+                    output += f"• **{project['name']}**\\n"
+                output += "\\n"
+
+            # Show recent projects (first 10)
+            output += "📋 **All Projects** (showing first 10):\\n"
+            for project in projects[:10]:
+                name = project['name']
+                if len(name) > 30:
+                    name = name[:27] + "..."
+                output += f"• {name}\\n"
+
+            if len(projects) > 10:
+                output += f"\\n... and {len(projects) - 10} more projects\\n"
+
+            return output
+        else:
+            return f"❌ Failed to get projects: {response.status_code}"
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+def create_todoist_task(content: str, priority: str = "medium", project_name: str = ""):
+    """
+    Create a new task in Todoist with intelligent priority mapping.
+
+    Args:
+        content: Task description
+        priority: low, medium, high, or urgent
+        project_name: Optional project name (searches for best match)
+    """
+    import requests
+
+    try:
+        # Map priority to Todoist scale (1-4)
+        priority_map = {
+            "low": 1,
+            "medium": 2,
+            "high": 3,
+            "urgent": 4
+        }
+        todoist_priority = priority_map.get(priority.lower(), 2)
+
+        task_data = {
+            "content": content,
+            "priority": todoist_priority
+        }
+
+        # If project specified, try to find it
+        if project_name:
+            projects_response = requests.get("http://localhost:8003/todoist/projects", timeout=5)
+            if projects_response.status_code == 200:
+                projects = projects_response.json()['projects']
+                # Simple search for matching project
+                for project in projects:
+                    if project_name.lower() in project['name'].lower():
+                        task_data["project_id"] = project['id']
+                        break
+
+        response = requests.post(
+            "http://localhost:8003/todoist/tasks",
+            json=task_data,
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            task = result['task']
+
+            output = f"✅ **Todoist Task Created**\\n\\n"
+            output += f"📝 **Title**: {task['content']}\\n"
+            output += f"⚡ **Priority**: {priority} (level {todoist_priority})\\n"
+            output += f"🆔 **ID**: {task['id']}\\n"
+
+            if task.get('project_id'):
+                output += f"📁 **Project**: {task['project_id']}\\n"
+
+            output += f"🔗 **Link**: {task['url']}\\n"
+
+            return output
+        else:
+            return f"❌ Failed to create task: {response.status_code}"
+    except Exception as e:
+        return f"❌ Error: {str(e)}"

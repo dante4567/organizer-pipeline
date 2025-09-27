@@ -94,6 +94,13 @@ A sophisticated, cloud-powered personal data management service with intelligent
 - `GET /files/{file_id}` - Download file
 - `DELETE /files/{file_id}` - Delete file
 
+### Todoist Integration
+- `GET /todoist/projects` - Get all Todoist projects
+- `GET /todoist/tasks` - Get tasks from Todoist (with filters)
+- `POST /todoist/tasks` - Create new task in Todoist
+- `POST /todoist/sync` - Sync Todoist tasks to local database
+- `POST /todoist/tasks/{task_id}/complete` - Mark Todoist task as completed
+
 ## Usage Examples
 
 ### Natural Language Commands
@@ -127,6 +134,26 @@ curl -X POST http://localhost:8003/contacts \
   -d '{"name": "Jane Smith", "email": "jane@company.com", "phone": "+1234567890", "company": "TechCorp"}'
 ```
 
+### Todoist Integration Usage
+```bash
+# Get all Todoist projects
+curl http://localhost:8003/todoist/projects
+
+# Get tasks from specific project
+curl "http://localhost:8003/todoist/tasks?project_id=2313957812"
+
+# Sync all Todoist tasks to local database
+curl -X POST http://localhost:8003/todoist/sync
+
+# Create task in Todoist
+curl -X POST http://localhost:8003/todoist/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"content": "New task from API", "priority": 3, "project_id": "2313957812"}'
+
+# Mark Todoist task as completed
+curl -X POST http://localhost:8003/todoist/tasks/9584356605/complete
+```
+
 ## OpenWebUI Integration
 
 Copy functions from `openwebui_functions.py` to integrate with OpenWebUI:
@@ -151,6 +178,9 @@ def get_smart_summary():
 GROQ_API_KEY=gsk-...
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
+
+# Todoist Integration
+TODOIST_API_TOKEN=your-todoist-api-token
 
 # Service Configuration
 DEFAULT_LLM=anthropic

@@ -25,6 +25,7 @@ from dataclasses import dataclass, asdict
 import re
 from dateutil import parser as date_parser
 import hashlib
+from icalendar import Calendar
 
 # Configure logging
 logging.basicConfig(
@@ -46,6 +47,10 @@ TIMEZONE = os.getenv("TIMEZONE", "UTC")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Todoist Integration
+TODOIST_API_TOKEN = os.getenv("TODOIST_API_TOKEN", "f5f875d4776fbe56d899ad25a632af1e9c9553d1")
+TODOIST_API_BASE = "https://api.todoist.com/rest/v2"
 
 # LLM Model Configuration
 LLM_MODELS = {
@@ -1644,6 +1649,203 @@ async def get_service_statistics():
         return stats
 
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Todoist Integration
+class TodoistService:
+    """Todoist API integration service"""
+
+    def __init__(self):
+        self.api_token = TODOIST_API_TOKEN
+        self.base_url = TODOIST_API_BASE
+        self.headers = {
+            "Authorization": f"Bearer {self.api_token}",
+            "Content-Type": "application/json"
+        }
+
+    async def get_projects(self) -> List[Dict]:
+        """Get all Todoist projects"""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/projects",
+                headers=self.headers
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_tasks(self, project_id: Optional[str] = None, filter_str: Optional[str] = None) -> List[Dict]:
+        """Get tasks from Todoist"""
+        params = {}
+        if project_id:
+            params["project_id"] = project_id
+        if filter_str:
+            params["filter"] = filter_str
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/tasks",
+                headers=self.headers,
+                params=params
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def create_task(self, task_data: Dict) -> Dict:
+        """Create a new task in Todoist"""
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/tasks",
+                headers=self.headers,
+                json=task_data
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def update_task(self, task_id: str, task_data: Dict) -> Dict:
+        """Update a task in Todoist"""
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/tasks/{task_id}",
+                headers=self.headers,
+                json=task_data
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def close_task(self, task_id: str) -> bool:
+        """Mark a task as completed in Todoist"""
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/tasks/{task_id}/close",
+                headers=self.headers
+            )
+            response.raise_for_status()
+            return True
+
+    async def sync_tasks_to_local(self, db_manager: 'DatabaseManager') -> Dict:
+        """Sync Todoist tasks to local database"""
+        try:
+            todoist_tasks = await self.get_tasks()
+            synced_count = 0
+
+            for todoist_task in todoist_tasks:
+                # Convert Todoist task to local task format
+                local_task = Task(
+                    title=todoist_task["content"],
+                    description=todoist_task.get("description", ""),
+                    priority=self._map_todoist_priority(todoist_task.get("priority", 1)),
+                    due_date=datetime.fromisoformat(todoist_task["due"]["date"]) if todoist_task.get("due") else None,
+                    tags=[f"todoist", f"project:{todoist_task.get('project_id', 'inbox')}"],
+                    metadata={
+                        "todoist_id": todoist_task["id"],
+                        "todoist_url": todoist_task.get("url"),
+                        "todoist_project_id": todoist_task.get("project_id"),
+                        "todoist_created_at": todoist_task.get("created_at")
+                    }
+                )
+
+                # Check if task already exists locally
+                conn = db_manager.get_connection()
+                existing = conn.execute(
+                    "SELECT id FROM tasks WHERE json_extract(metadata, '$.todoist_id') = ?",
+                    (todoist_task["id"],)
+                ).fetchone()
+
+                if not existing:
+                    task_service = TaskService(db_manager)
+                    task_service.create_task(local_task)
+                    synced_count += 1
+
+                conn.close()
+
+            return {
+                "synced_tasks": synced_count,
+                "total_todoist_tasks": len(todoist_tasks),
+                "timestamp": datetime.now().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"Todoist sync error: {e}")
+            raise
+
+    def _map_todoist_priority(self, todoist_priority: int) -> TaskPriority:
+        """Map Todoist priority (1-4) to local priority"""
+        priority_map = {
+            1: TaskPriority.low,
+            2: TaskPriority.medium,
+            3: TaskPriority.high,
+            4: TaskPriority.urgent
+        }
+        return priority_map.get(todoist_priority, TaskPriority.medium)
+
+# Initialize Todoist service
+todoist_service = TodoistService()
+
+# Scheduled Todoist sync function
+async def scheduled_todoist_sync():
+    """Periodic Todoist sync task"""
+    try:
+        logger.info("Starting scheduled Todoist sync...")
+        sync_result = await todoist_service.sync_tasks_to_local(db_manager)
+        logger.info(f"Todoist sync completed: {sync_result}")
+    except Exception as e:
+        logger.error(f"Scheduled Todoist sync failed: {e}")
+
+# Todoist API endpoints
+@app.get("/todoist/projects")
+async def get_todoist_projects():
+    """Get all Todoist projects"""
+    try:
+        projects = await todoist_service.get_projects()
+        return {"projects": projects, "count": len(projects)}
+    except Exception as e:
+        logger.error(f"Error fetching Todoist projects: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/todoist/tasks")
+async def get_todoist_tasks(
+    project_id: Optional[str] = Query(None, description="Filter by project ID"),
+    filter_str: Optional[str] = Query(None, description="Todoist filter string")
+):
+    """Get tasks from Todoist"""
+    try:
+        tasks = await todoist_service.get_tasks(project_id, filter_str)
+        return {"tasks": tasks, "count": len(tasks)}
+    except Exception as e:
+        logger.error(f"Error fetching Todoist tasks: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/todoist/tasks")
+async def create_todoist_task(task_data: Dict[str, Any]):
+    """Create a new task in Todoist"""
+    try:
+        task = await todoist_service.create_task(task_data)
+        return {"task": task, "message": "Task created in Todoist"}
+    except Exception as e:
+        logger.error(f"Error creating Todoist task: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/todoist/sync")
+async def sync_todoist_tasks():
+    """Sync Todoist tasks to local database"""
+    try:
+        sync_result = await todoist_service.sync_tasks_to_local(db_manager)
+        return {
+            "message": "Todoist sync completed successfully",
+            "result": sync_result
+        }
+    except Exception as e:
+        logger.error(f"Todoist sync failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/todoist/tasks/{task_id}/complete")
+async def complete_todoist_task(task_id: str):
+    """Mark a Todoist task as completed"""
+    try:
+        success = await todoist_service.close_task(task_id)
+        return {"message": "Task marked as completed in Todoist", "success": success}
+    except Exception as e:
+        logger.error(f"Error completing Todoist task: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
