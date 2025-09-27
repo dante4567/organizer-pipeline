@@ -82,12 +82,11 @@ cp enhanced_config.json my_config.json
 python enhanced_personal_assistant.py
 ```
 
-### Option 3: Nix
+### Option 3: Container Interactive
 
 ```bash
-# Create shell.nix (see SETUP.md)
-nix-shell
-python enhanced_personal_assistant.py
+# Run interactively in container
+docker run -it --rm -p 8000:8000 organizer-pipeline python enhanced_personal_assistant.py
 ```
 
 ## ⚙️ Configuration
