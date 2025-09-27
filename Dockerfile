@@ -32,9 +32,7 @@ VOLUME ["/app/data"]
 # Expose port for future web interface
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health', timeout=5)" || exit 1
+# No health check needed for CLI application
 
 # Default command (can be overridden)
 CMD ["python", "enhanced_personal_assistant.py"]

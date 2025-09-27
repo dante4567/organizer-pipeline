@@ -344,12 +344,16 @@ class FileMonitor(FileSystemEventHandler):
         logger.info(f"File activity: {activity.description}")
 
 class EnhancedPersonalAssistant:
-    def __init__(self, config_file: str = "enhanced_config.json", data_dir: str = "./data"):
+    def __init__(self, config_file: Union[str, Dict] = "enhanced_config.json", data_dir: str = "./data"):
         """Initialize enhanced personal assistant"""
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(exist_ok=True)
-        
-        self.config = self.load_config(config_file)
+
+        # Handle both file path and dict config
+        if isinstance(config_file, dict):
+            self.config = self._merge_with_defaults(config_file)
+        else:
+            self.config = self.load_config(config_file)
         self.llm_provider = self.setup_llm_provider()
         
         # Initialize storage
@@ -446,6 +450,52 @@ class EnhancedPersonalAssistant:
                 self._deep_merge(default[key], value)
             else:
                 default[key] = value
+
+    def _merge_with_defaults(self, user_config: Dict) -> Dict:
+        """Merge user config with default configuration"""
+        default_config = {
+            "llm": {
+                "provider": "demo",
+                "model": "demo-model",
+                "api_key": "demo-key",
+                "base_url": "",
+                "max_tokens": 2000
+            },
+            "caldav": {
+                "url": "",
+                "username": "",
+                "password": ""
+            },
+            "carddav": {
+                "url": "",
+                "username": "",
+                "password": ""
+            },
+            "monitoring": {
+                "watch_directories": ["./test_watch"],
+                "file_extensions": [".txt", ".md"],
+                "daily_summary_time": "18:00"
+            },
+            "preferences": {
+                "default_calendar": "Personal",
+                "default_event_duration": 60,
+                "timezone": "UTC",
+                "auto_categorize": True,
+                "smart_suggestions": True
+            },
+            "integrations": {
+                "email_enabled": False,
+                "email_server": "",
+                "web_interface": True,
+                "api_enabled": True
+            }
+        }
+
+        # Deep merge user config into defaults
+        import copy
+        merged_config = copy.deepcopy(default_config)
+        self._deep_merge(merged_config, user_config)
+        return merged_config
     
     def setup_llm_provider(self) -> LLMProvider:
         """Setup LLM provider based on configuration"""
@@ -507,15 +557,15 @@ class EnhancedPersonalAssistant:
         try:
             principal = self.caldav_client.principal()
             calendars = principal.calendars()
-            
+
             for calendar in calendars:
                 name = calendar.name or "Unnamed Calendar"
                 self.calendars[name] = calendar
                 logger.info(f"📅 Found calendar: {name}")
-            except caldav.lib.error.NotFoundError:
-                logger.error("Error discovering calendars: Principal or calendar collection not found.")
-            except Exception as e:
-                logger.error(f"Error discovering calendars: Unexpected error: {e.__class__.__name__}: {e}")
+        except caldav.lib.error.NotFoundError:
+            logger.error("Error discovering calendars: Principal or calendar collection not found.")
+        except Exception as e:
+            logger.error(f"Error discovering calendars: Unexpected error: {e.__class__.__name__}: {e}")
     
     def discover_address_books(self):
         """Discover available address books"""
@@ -525,15 +575,15 @@ class EnhancedPersonalAssistant:
         try:
             principal = self.carddav_client.principal()
             address_books = principal.address_books()
-            
+
             for ab in address_books:
                 name = ab.name or "Unnamed Address Book"
                 self.address_books[name] = ab
                 logger.info(f"📇 Found address book: {name}")
-            except caldav.lib.error.NotFoundError:
-                logger.error("Error discovering address books: Principal or address book collection not found.")
-            except Exception as e:
-                logger.error(f"Error discovering address books: Unexpected error: {e.__class__.__name__}: {e}")
+        except caldav.lib.error.NotFoundError:
+            logger.error("Error discovering address books: Principal or address book collection not found.")
+        except Exception as e:
+            logger.error(f"Error discovering address books: Unexpected error: {e.__class__.__name__}: {e}")
     
     def setup_file_monitoring(self):
         """Setup file system monitoring"""
@@ -762,13 +812,13 @@ Rules:
             
             cal.add_component(ical_event)
             calendar.add_event(cal.to_ical().decode('utf-8'))
-            
-            except caldav.lib.error.NotFoundError:
-                logger.error("Error syncing event to CalDAV: Target calendar not found.")
-            except caldav.lib.error.ReportError as e:
-                logger.error(f"Error syncing event to CalDAV: CalDAV report error: {e}")
-            except Exception as e:
-                logger.error(f"Error syncing event to CalDAV: Unexpected error: {e.__class__.__name__}: {e}")
+
+        except caldav.lib.error.NotFoundError:
+            logger.error("Error syncing event to CalDAV: Target calendar not found.")
+        except caldav.lib.error.ReportError as e:
+            logger.error(f"Error syncing event to CalDAV: CalDAV report error: {e}")
+        except Exception as e:
+            logger.error(f"Error syncing event to CalDAV: Unexpected error: {e.__class__.__name__}: {e}")
     
     def create_todo(self, todo_data: Dict) -> bool:
         """Create enhanced todo item"""
@@ -863,37 +913,38 @@ Rules:
                 vcard.note.value = contact.notes
             
             address_book.add_contact(vcard.serialize())
-            
-            except caldav.lib.error.NotFoundError:
-                logger.error("Error syncing contact to CardDAV: Target address book not found.")
-            except caldav.lib.error.ReportError as e:
-                logger.error(f"Error syncing contact to CardDAV: CardDAV report error: {e}")
-            except Exception as e:
-                logger.error(f"Error syncing contact to CardDAV: Unexpected error: {e.__class__.__name__}: {e}")
-    
-        def load_events(self) -> List[CalendarEvent]:
-            """Load events from file"""
-            try:
-                with open(self.events_file, 'r') as f:
-                    data = json.load(f)
-                return [
-                    CalendarEvent(
-                        title=item['title'],
-                        start_time=datetime.fromisoformat(item['start_time']),
-                        end_time=datetime.fromisoformat(item['end_time']) if item.get('end_time') else None,
-                        description=item.get('description', ''),
-                        location=item.get('location', ''),
-                        attendees=item.get('attendees', []),
-                        uid=item.get('uid'),
-                        recurring=item.get('recurring', False),
-                        recurrence_rule=item.get('recurrence_rule'),
-                        created_at=datetime.fromisoformat(item['created_at']) if item.get('created_at') else None,
-                        updated_at=datetime.fromisoformat(item['updated_at']) if item.get('updated_at') else None
-                    )
-                    for item in data
-                ]
-            except FileNotFoundError:
-                return []        except PermissionError:
+
+        except caldav.lib.error.NotFoundError:
+            logger.error("Error syncing contact to CardDAV: Target address book not found.")
+        except caldav.lib.error.ReportError as e:
+            logger.error(f"Error syncing contact to CardDAV: CardDAV report error: {e}")
+        except Exception as e:
+            logger.error(f"Error syncing contact to CardDAV: Unexpected error: {e.__class__.__name__}: {e}")
+
+    def load_events(self) -> List[CalendarEvent]:
+        """Load events from file"""
+        try:
+            with open(self.events_file, 'r') as f:
+                data = json.load(f)
+            return [
+                CalendarEvent(
+                    title=item['title'],
+                    start_time=datetime.fromisoformat(item['start_time']),
+                    end_time=datetime.fromisoformat(item['end_time']) if item.get('end_time') else None,
+                    description=item.get('description', ''),
+                    location=item.get('location', ''),
+                    attendees=item.get('attendees', []),
+                    uid=item.get('uid'),
+                    recurring=item.get('recurring', False),
+                    recurrence_rule=item.get('recurrence_rule'),
+                    created_at=datetime.fromisoformat(item['created_at']) if item.get('created_at') else None,
+                    updated_at=datetime.fromisoformat(item['updated_at']) if item.get('updated_at') else None
+                )
+                for item in data
+            ]
+        except FileNotFoundError:
+            return []
+        except PermissionError:
             logger.error(f"Permission denied when trying to read {self.events_file}")
             return []
         except json.JSONDecodeError as e:
@@ -1131,16 +1182,16 @@ Keep it under 200 words and make it actionable."""
             
             logger.info(f"📊 Generated daily summary for {today}")
             return summary
-            
-            except PermissionError:
-                logger.error(f"Permission denied when trying to write daily summary to {summary_file}")
-                return None
-            except IOError as e:
-                logger.error(f"I/O error when writing daily summary to {summary_file}: {e}")
-                return None
-            except Exception as e:
-                logger.error(f"Error generating daily summary: {e.__class__.__name__}: {e}")
-                return None
+
+        except PermissionError:
+            logger.error(f"Permission denied when trying to write daily summary to {summary_file}")
+            return None
+        except IOError as e:
+            logger.error(f"I/O error when writing daily summary to {summary_file}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error generating daily summary: {e.__class__.__name__}: {e}")
+            return None
     
     def cleanup_old_data(self):
         """Clean up old data"""

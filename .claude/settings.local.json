@@ -22,7 +22,10 @@
       "Bash(docker-compose:*)",
       "Bash(docker logs:*)",
       "Bash(grep:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(python -m pytest test_enhanced.py -v)",
+      "Bash(python test:*)",
+      "Bash(docker inspect:*)"
     ],
     "deny": [],
     "ask": []
