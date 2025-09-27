@@ -14,6 +14,7 @@ services:
       - CALDAV_USERNAME=${CALDAV_USERNAME}
       - CALDAV_PASSWORD=${CALDAV_PASSWORD}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - DB_PATH=/data/cloud_personal.db
       - FILES_ROOT=/data/files
       - DEFAULT_LLM=anthropic

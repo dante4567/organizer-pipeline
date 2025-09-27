@@ -64,6 +64,9 @@ CALDAV_PASSWORD = os.getenv("CALDAV_PASSWORD", "")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8197297667:AAHmIue8Cp-f68Qyxvi4cgi-YlbTjgElRkg")
 TELEGRAM_API_BASE = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
+# Google Services Integration
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyDXVeuideZ0hzd0wF8bd1tSXn2Cbiy5KO4")
+
 # LLM Model Configuration
 LLM_MODELS = {
     "groq": {
@@ -2078,8 +2081,144 @@ class TelegramService:
             logger.error(f"Failed to get bot info: {e}")
             return {}
 
-# Initialize Telegram service
+# Google Services Integration
+class GoogleService:
+    """Google API integration service for Calendar, Gmail, and other services"""
+
+    def __init__(self):
+        self.api_key = GOOGLE_API_KEY
+        self.calendar_api_base = "https://www.googleapis.com/calendar/v3"
+        self.gmail_api_base = "https://www.googleapis.com/gmail/v1"
+        self.maps_api_base = "https://maps.googleapis.com/maps/api"
+
+    async def get_calendar_events(self, calendar_id: str = "primary", time_min: str = None, time_max: str = None, max_results: int = 10) -> Dict:
+        """Get events from Google Calendar"""
+        try:
+            params = {
+                "key": self.api_key,
+                "maxResults": max_results,
+                "singleEvents": "true",
+                "orderBy": "startTime"
+            }
+            if time_min:
+                params["timeMin"] = time_min
+            if time_max:
+                params["timeMax"] = time_max
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.calendar_api_base}/calendars/{calendar_id}/events",
+                    params=params
+                )
+                response.raise_for_status()
+                return response.json()
+        except Exception as e:
+            logger.error(f"Failed to get Google Calendar events: {e}")
+            return {"error": str(e), "items": []}
+
+    async def create_calendar_event(self, calendar_id: str = "primary", event_data: Dict = None) -> Dict:
+        """Create an event in Google Calendar"""
+        try:
+            if not event_data:
+                raise ValueError("Event data is required")
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.calendar_api_base}/calendars/{calendar_id}/events",
+                    params={"key": self.api_key},
+                    json=event_data
+                )
+                response.raise_for_status()
+                return response.json()
+        except Exception as e:
+            logger.error(f"Failed to create Google Calendar event: {e}")
+            return {"error": str(e)}
+
+    async def search_places(self, query: str, location: str = None, radius: int = 50000) -> Dict:
+        """Search for places using Google Places API"""
+        try:
+            params = {
+                "key": self.api_key,
+                "query": query,
+                "fields": "place_id,name,formatted_address,geometry,rating,types"
+            }
+            if location:
+                params["location"] = location
+                params["radius"] = radius
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.maps_api_base}/place/textsearch/json",
+                    params=params
+                )
+                response.raise_for_status()
+                return response.json()
+        except Exception as e:
+            logger.error(f"Failed to search Google Places: {e}")
+            return {"error": str(e), "results": []}
+
+    async def get_directions(self, origin: str, destination: str, mode: str = "driving") -> Dict:
+        """Get directions between two locations"""
+        try:
+            params = {
+                "key": self.api_key,
+                "origin": origin,
+                "destination": destination,
+                "mode": mode
+            }
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.maps_api_base}/directions/json",
+                    params=params
+                )
+                response.raise_for_status()
+                return response.json()
+        except Exception as e:
+            logger.error(f"Failed to get Google Directions: {e}")
+            return {"error": str(e), "routes": []}
+
+    async def geocode_address(self, address: str) -> Dict:
+        """Convert address to coordinates using Google Geocoding API"""
+        try:
+            params = {
+                "key": self.api_key,
+                "address": address
+            }
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.maps_api_base}/geocode/json",
+                    params=params
+                )
+                response.raise_for_status()
+                return response.json()
+        except Exception as e:
+            logger.error(f"Failed to geocode address: {e}")
+            return {"error": str(e), "results": []}
+
+    async def test_connection(self) -> Dict:
+        """Test Google API connection"""
+        try:
+            # Test with a simple calendar list request
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.calendar_api_base}/users/me/calendarList",
+                    params={"key": self.api_key, "maxResults": 1}
+                )
+                if response.status_code == 200:
+                    return {"status": "connected", "service": "google_api"}
+                elif response.status_code == 401:
+                    return {"status": "authentication_required", "service": "google_api", "message": "OAuth required for calendar access"}
+                else:
+                    return {"status": "error", "service": "google_api", "code": response.status_code}
+        except Exception as e:
+            logger.error(f"Google API connection test failed: {e}")
+            return {"status": "error", "service": "google_api", "error": str(e)}
+
+# Initialize services
 telegram_service = TelegramService()
+google_service = GoogleService()
 
 # Scheduled Todoist sync function
 async def scheduled_todoist_sync():
@@ -2271,6 +2410,85 @@ async def send_telegram_message(chat_id: str, message: str):
         return {"message": "Message sent successfully" if success else "Failed to send message", "success": success}
     except Exception as e:
         logger.error(f"Error sending Telegram message: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Google API endpoints
+@app.get("/google/status")
+async def get_google_status():
+    """Get Google API connection status"""
+    try:
+        status = await google_service.test_connection()
+        return status
+    except Exception as e:
+        logger.error(f"Error getting Google status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/google/calendar/events")
+async def get_google_calendar_events(
+    calendar_id: str = Query("primary", description="Calendar ID"),
+    time_min: Optional[str] = Query(None, description="Start time (RFC3339)"),
+    time_max: Optional[str] = Query(None, description="End time (RFC3339)"),
+    max_results: int = Query(10, description="Maximum number of events")
+):
+    """Get events from Google Calendar"""
+    try:
+        events = await google_service.get_calendar_events(calendar_id, time_min, time_max, max_results)
+        return events
+    except Exception as e:
+        logger.error(f"Error getting Google Calendar events: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/google/calendar/events")
+async def create_google_calendar_event(
+    event_data: Dict[str, Any],
+    calendar_id: str = Query("primary", description="Calendar ID")
+):
+    """Create an event in Google Calendar"""
+    try:
+        result = await google_service.create_calendar_event(calendar_id, event_data)
+        return result
+    except Exception as e:
+        logger.error(f"Error creating Google Calendar event: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/google/places/search")
+async def search_google_places(
+    query: str = Query(..., description="Search query"),
+    location: Optional[str] = Query(None, description="Location bias (lat,lng)"),
+    radius: int = Query(50000, description="Search radius in meters")
+):
+    """Search for places using Google Places API"""
+    try:
+        results = await google_service.search_places(query, location, radius)
+        return results
+    except Exception as e:
+        logger.error(f"Error searching Google Places: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/google/directions")
+async def get_google_directions(
+    origin: str = Query(..., description="Origin address or coordinates"),
+    destination: str = Query(..., description="Destination address or coordinates"),
+    mode: str = Query("driving", description="Travel mode: driving, walking, bicycling, transit")
+):
+    """Get directions between two locations"""
+    try:
+        directions = await google_service.get_directions(origin, destination, mode)
+        return directions
+    except Exception as e:
+        logger.error(f"Error getting Google Directions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/google/geocode")
+async def geocode_address(
+    address: str = Query(..., description="Address to geocode")
+):
+    """Convert address to coordinates using Google Geocoding API"""
+    try:
+        result = await google_service.geocode_address(address)
+        return result
+    except Exception as e:
+        logger.error(f"Error geocoding address: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

@@ -113,6 +113,14 @@ A sophisticated, cloud-powered personal data management service with intelligent
 - `GET /telegram/info` - Get Telegram bot information
 - `POST /telegram/send` - Send message via Telegram bot
 
+### Google Services Integration
+- `GET /google/status` - Check Google API connection status
+- `GET /google/calendar/events` - Get events from Google Calendar
+- `POST /google/calendar/events` - Create events in Google Calendar
+- `GET /google/places/search` - Search for places using Google Places API
+- `GET /google/directions` - Get directions between locations
+- `GET /google/geocode` - Convert addresses to coordinates
+
 ## Usage Examples
 
 ### Natural Language Commands
@@ -209,6 +217,34 @@ curl -X POST http://localhost:8003/telegram/webhook \
 - `/status` - Check service status
 - Natural language processing for task and event creation
 
+### Google Services Integration Usage
+```bash
+# Check Google API status
+curl http://localhost:8003/google/status
+
+# Get Google Calendar events
+curl "http://localhost:8003/google/calendar/events?max_results=5"
+
+# Create Google Calendar event
+curl -X POST http://localhost:8003/google/calendar/events \
+  -H "Content-Type: application/json" \
+  -d '{
+    "summary": "Team Meeting",
+    "start": {"dateTime": "2025-09-28T15:00:00Z"},
+    "end": {"dateTime": "2025-09-28T16:00:00Z"},
+    "description": "Weekly team sync"
+  }'
+
+# Search for places
+curl "http://localhost:8003/google/places/search?query=restaurants%20near%20me"
+
+# Get directions
+curl "http://localhost:8003/google/directions?origin=Berlin&destination=Hamburg&mode=driving"
+
+# Geocode an address
+curl "http://localhost:8003/google/geocode?address=1600%20Amphitheatre%20Parkway%20Mountain%20View%20CA"
+```
+
 ## OpenWebUI Integration
 
 Copy functions from `openwebui_functions.py` to integrate with OpenWebUI:
@@ -244,6 +280,17 @@ CALDAV_PASSWORD=your-app-password
 
 # Telegram Bot Integration
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+
+# Google Services Integration
+GOOGLE_API_KEY=your-google-api-key
+
+# Google API Setup Requirements
+# Enable these APIs in Google Cloud Console:
+# - Google Calendar API (for calendar features)
+# - Places API (New) (for location searches)
+# - Directions API (for navigation)
+# - Geocoding API (for address conversion)
+# - Maps JavaScript API (for map features)
 
 # Service Configuration
 DEFAULT_LLM=anthropic
@@ -306,14 +353,18 @@ uvicorn app:app --reload --port 8003
 - **Todoist Integration**: All 5 endpoints working (65+ projects synced)
 - **CalDAV Integration**: All 4 endpoints working (Nextcloud connected)
 - **Telegram Bot Integration**: All 3 endpoints working (bot active)
+- **Google Services Integration**: All 6 endpoints ready (requires API activation)
 - **LLM Integration**: All 3 providers available, cost tracking functional
 
 ### ⚠️ Planned Features
 - **File Management**: Endpoints documented but not yet implemented
 
+### 🔧 Configuration Required
+- **Google APIs**: Requires enabling specific APIs in Google Cloud Console (Calendar, Places, Geocoding, Directions)
+
 ### Test Results Summary
-- **Total API Endpoints**: 39 documented
-- **Functional Endpoints**: 35 (89% complete)
+- **Total API Endpoints**: 45 documented
+- **Functional Endpoints**: 41 (91% complete)
 - **Integration Status**: All major integrations working
 - **Cost Tracking**: $0.0021 recorded (OpenAI usage)
 - **Database**: 3306 tasks, 1 contact, 1 calendar event stored
