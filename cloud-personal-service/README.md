@@ -101,6 +101,12 @@ A sophisticated, cloud-powered personal data management service with intelligent
 - `POST /todoist/sync` - Sync Todoist tasks to local database
 - `POST /todoist/tasks/{task_id}/complete` - Mark Todoist task as completed
 
+### Nextcloud CalDAV Integration
+- `GET /caldav/events` - Get events from Nextcloud calendar (with date filters)
+- `POST /caldav/events` - Create new event in Nextcloud calendar
+- `POST /caldav/sync` - Sync Nextcloud calendar events to local database
+- `GET /caldav/status` - Check CalDAV connection status
+
 ## Usage Examples
 
 ### Natural Language Commands
@@ -154,6 +160,23 @@ curl -X POST http://localhost:8003/todoist/tasks \
 curl -X POST http://localhost:8003/todoist/tasks/9584356605/complete
 ```
 
+### Nextcloud CalDAV Usage
+```bash
+# Check CalDAV connection status
+curl http://localhost:8003/caldav/status
+
+# Get events from Nextcloud calendar
+curl "http://localhost:8003/caldav/events?start_date=2025-09-27T00:00:00&end_date=2025-09-28T00:00:00"
+
+# Create event in Nextcloud calendar
+curl -X POST http://localhost:8003/caldav/events \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Team Meeting", "start_time": "2025-09-27T15:00:00", "end_time": "2025-09-27T16:00:00", "description": "Weekly team sync", "location": "Conference Room A"}'
+
+# Sync Nextcloud calendar events to local database
+curl -X POST http://localhost:8003/caldav/sync
+```
+
 ## OpenWebUI Integration
 
 Copy functions from `openwebui_functions.py` to integrate with OpenWebUI:
@@ -181,6 +204,11 @@ OPENAI_API_KEY=sk-...
 
 # Todoist Integration
 TODOIST_API_TOKEN=your-todoist-api-token
+
+# Nextcloud CalDAV Integration
+CALDAV_URL=https://your-nextcloud.domain/remote.php/dav/calendars/username/calendar-name/
+CALDAV_USERNAME=your-username
+CALDAV_PASSWORD=your-app-password
 
 # Service Configuration
 DEFAULT_LLM=anthropic

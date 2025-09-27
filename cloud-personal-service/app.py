@@ -25,7 +25,10 @@ from dataclasses import dataclass, asdict
 import re
 from dateutil import parser as date_parser
 import hashlib
-from icalendar import Calendar
+from icalendar import Calendar, Event as iCalEvent
+import caldav
+from caldav import DAVClient
+from urllib.parse import urlparse
 
 # Configure logging
 logging.basicConfig(
@@ -51,6 +54,11 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # Todoist Integration
 TODOIST_API_TOKEN = os.getenv("TODOIST_API_TOKEN", "f5f875d4776fbe56d899ad25a632af1e9c9553d1")
 TODOIST_API_BASE = "https://api.todoist.com/rest/v2"
+
+# Nextcloud CalDAV Integration
+CALDAV_URL = os.getenv("CALDAV_URL", "https://cloud.basurgis.de/remote.php/dav/calendars/ai/personal/")
+CALDAV_USERNAME = os.getenv("CALDAV_USERNAME", "ai")
+CALDAV_PASSWORD = os.getenv("CALDAV_PASSWORD", "")
 
 # LLM Model Configuration
 LLM_MODELS = {
@@ -1781,6 +1789,191 @@ class TodoistService:
 # Initialize Todoist service
 todoist_service = TodoistService()
 
+# CalDAV Service for Nextcloud integration
+class CalDAVService:
+    """Nextcloud CalDAV integration service"""
+
+    def __init__(self):
+        self.url = CALDAV_URL
+        self.username = CALDAV_USERNAME
+        self.password = CALDAV_PASSWORD
+        self.client = None
+        self.calendar = None
+        self._initialize_client()
+
+    def _initialize_client(self):
+        """Initialize CalDAV client and calendar"""
+        try:
+            if not self.password:
+                logger.warning("CalDAV password not configured")
+                return
+
+            self.client = DAVClient(
+                url=self.url,
+                username=self.username,
+                password=self.password
+            )
+
+            # Get the calendar directly from the URL
+            self.calendar = caldav.Calendar(client=self.client, url=self.url)
+            logger.info("CalDAV client initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize CalDAV client: {e}")
+
+    async def get_events(self, start_date: datetime = None, end_date: datetime = None) -> List[Dict]:
+        """Get events from CalDAV calendar"""
+        try:
+            if not self.calendar:
+                return []
+
+            # Default to current month if no dates specified
+            if not start_date:
+                start_date = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            if not end_date:
+                # Last day of current month
+                next_month = start_date.replace(month=start_date.month + 1) if start_date.month < 12 else start_date.replace(year=start_date.year + 1, month=1)
+                end_date = next_month - timedelta(days=1)
+
+            # Search for events in date range
+            events = self.calendar.search(
+                start=start_date,
+                end=end_date,
+                event=True,
+                expand=True
+            )
+
+            result = []
+            for event in events:
+                try:
+                    # Parse the iCalendar data
+                    ical_data = Calendar.from_ical(event.data)
+                    for component in ical_data.walk():
+                        if component.name == "VEVENT":
+                            event_data = {
+                                "uid": str(component.get('UID', '')),
+                                "title": str(component.get('SUMMARY', 'Untitled')),
+                                "description": str(component.get('DESCRIPTION', '')),
+                                "start_time": component.get('DTSTART').dt.isoformat() if component.get('DTSTART') else None,
+                                "end_time": component.get('DTEND').dt.isoformat() if component.get('DTEND') else None,
+                                "location": str(component.get('LOCATION', '')),
+                                "created": component.get('CREATED').dt.isoformat() if component.get('CREATED') else None,
+                                "last_modified": component.get('LAST-MODIFIED').dt.isoformat() if component.get('LAST-MODIFIED') else None,
+                                "caldav_url": event.url
+                            }
+                            result.append(event_data)
+                except Exception as e:
+                    logger.warning(f"Failed to parse event: {e}")
+                    continue
+
+            return result
+        except Exception as e:
+            logger.error(f"Failed to get CalDAV events: {e}")
+            return []
+
+    async def create_event(self, event_data: Dict) -> str:
+        """Create an event in CalDAV calendar"""
+        try:
+            if not self.calendar:
+                raise Exception("CalDAV calendar not available")
+
+            # Create iCalendar event
+            cal = Calendar()
+            cal.add('prodid', '-//Cloud Personal Service//CalDAV Event//EN')
+            cal.add('version', '2.0')
+
+            event = iCalEvent()
+            event.add('uid', str(uuid.uuid4()))
+            event.add('summary', event_data.get('title', 'Untitled'))
+
+            if event_data.get('description'):
+                event.add('description', event_data['description'])
+
+            if event_data.get('location'):
+                event.add('location', event_data['location'])
+
+            # Handle datetime
+            start_dt = datetime.fromisoformat(event_data['start_time'].replace('Z', '+00:00'))
+            event.add('dtstart', start_dt)
+
+            if event_data.get('end_time'):
+                end_dt = datetime.fromisoformat(event_data['end_time'].replace('Z', '+00:00'))
+                event.add('dtend', end_dt)
+            else:
+                # Default 1 hour duration
+                event.add('dtend', start_dt + timedelta(hours=1))
+
+            event.add('created', datetime.now())
+            event.add('last-modified', datetime.now())
+
+            cal.add_component(event)
+
+            # Save to CalDAV
+            caldav_event = self.calendar.save_event(cal.to_ical().decode('utf-8'))
+
+            return str(event['uid'])
+        except Exception as e:
+            logger.error(f"Failed to create CalDAV event: {e}")
+            raise
+
+    async def sync_events_to_local(self, db_manager: 'DatabaseManager') -> Dict:
+        """Sync CalDAV events to local database"""
+        try:
+            # Get events from last 30 days and next 90 days
+            start_date = datetime.now() - timedelta(days=30)
+            end_date = datetime.now() + timedelta(days=90)
+
+            caldav_events = await self.get_events(start_date, end_date)
+            synced_count = 0
+
+            for caldav_event in caldav_events:
+                # Convert CalDAV event to local event format
+                try:
+                    local_event = CalendarEvent(
+                        title=caldav_event["title"],
+                        description=caldav_event.get("description", ""),
+                        start_time=datetime.fromisoformat(caldav_event["start_time"]) if caldav_event.get("start_time") else datetime.now(),
+                        end_time=datetime.fromisoformat(caldav_event["end_time"]) if caldav_event.get("end_time") else None,
+                        location=caldav_event.get("location", ""),
+                        event_type=EventType.meeting,
+                        metadata={
+                            "caldav_uid": caldav_event["uid"],
+                            "caldav_url": caldav_event.get("caldav_url"),
+                            "caldav_created": caldav_event.get("created"),
+                            "caldav_modified": caldav_event.get("last_modified"),
+                            "source": "nextcloud_caldav"
+                        }
+                    )
+
+                    # Check if event already exists locally
+                    conn = db_manager.get_connection()
+                    existing = conn.execute(
+                        "SELECT id FROM calendar_events WHERE json_extract(metadata, '$.caldav_uid') = ?",
+                        (caldav_event["uid"],)
+                    ).fetchone()
+
+                    if not existing:
+                        calendar_service = CalendarService(db_manager)
+                        calendar_service.create_event(local_event)
+                        synced_count += 1
+
+                    conn.close()
+                except Exception as e:
+                    logger.warning(f"Failed to sync event {caldav_event.get('title', 'Unknown')}: {e}")
+                    continue
+
+            return {
+                "synced_events": synced_count,
+                "total_caldav_events": len(caldav_events),
+                "timestamp": datetime.now().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"CalDAV sync error: {e}")
+            raise
+
+# Initialize CalDAV service
+caldav_service = CalDAVService()
+
 # Scheduled Todoist sync function
 async def scheduled_todoist_sync():
     """Periodic Todoist sync task"""
@@ -1790,6 +1983,16 @@ async def scheduled_todoist_sync():
         logger.info(f"Todoist sync completed: {sync_result}")
     except Exception as e:
         logger.error(f"Scheduled Todoist sync failed: {e}")
+
+# Scheduled CalDAV sync function
+async def scheduled_caldav_sync():
+    """Periodic CalDAV sync task"""
+    try:
+        logger.info("Starting scheduled CalDAV sync...")
+        sync_result = await caldav_service.sync_events_to_local(db_manager)
+        logger.info(f"CalDAV sync completed: {sync_result}")
+    except Exception as e:
+        logger.error(f"Scheduled CalDAV sync failed: {e}")
 
 # Todoist API endpoints
 @app.get("/todoist/projects")
@@ -1847,6 +2050,79 @@ async def complete_todoist_task(task_id: str):
     except Exception as e:
         logger.error(f"Error completing Todoist task: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# CalDAV API endpoints
+@app.get("/caldav/events")
+async def get_caldav_events(
+    start_date: Optional[str] = Query(None, description="Start date in ISO format"),
+    end_date: Optional[str] = Query(None, description="End date in ISO format")
+):
+    """Get events from Nextcloud CalDAV calendar"""
+    try:
+        start_dt = None
+        end_dt = None
+
+        if start_date:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        if end_date:
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+
+        events = await caldav_service.get_events(start_dt, end_dt)
+        return {"events": events, "count": len(events)}
+    except Exception as e:
+        logger.error(f"Error fetching CalDAV events: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/caldav/events")
+async def create_caldav_event(event_data: Dict[str, Any]):
+    """Create a new event in Nextcloud CalDAV calendar"""
+    try:
+        event_uid = await caldav_service.create_event(event_data)
+        return {"event_uid": event_uid, "message": "Event created in Nextcloud calendar"}
+    except Exception as e:
+        logger.error(f"Error creating CalDAV event: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/caldav/sync")
+async def sync_caldav_events():
+    """Sync Nextcloud CalDAV events to local database"""
+    try:
+        sync_result = await caldav_service.sync_events_to_local(db_manager)
+        return {
+            "message": "CalDAV sync completed successfully",
+            "result": sync_result
+        }
+    except Exception as e:
+        logger.error(f"CalDAV sync failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/caldav/status")
+async def get_caldav_status():
+    """Check CalDAV connection status"""
+    try:
+        if caldav_service.calendar:
+            # Try to get a small number of events to test connection
+            test_events = await caldav_service.get_events(
+                datetime.now(),
+                datetime.now() + timedelta(days=1)
+            )
+            return {
+                "status": "connected",
+                "calendar_url": caldav_service.url,
+                "username": caldav_service.username,
+                "test_events_count": len(test_events)
+            }
+        else:
+            return {
+                "status": "disconnected",
+                "error": "CalDAV calendar not initialized"
+            }
+    except Exception as e:
+        logger.error(f"CalDAV status check failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
     import uvicorn
