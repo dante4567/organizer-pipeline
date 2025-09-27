@@ -1,0 +1,13 @@
+[
+  {
+    "title": "Call The Bank",
+    "description": "Demo todo item",
+    "due_date": "2025-10-02T09:00:00",
+    "priority": "normal",
+    "completed": false,
+    "uid": "843737de-5b26-44cb-a850-ae2250cf1377",
+    "tags": [],
+    "created_at": "2025-09-27T07:35:35.242798",
+    "completed_at": null
+  }
+]

@@ -1,10 +1,9 @@
-
 {
   "llm": {
-    "provider": "anthropic",
-    "model": "claude-3-sonnet-20240229",
-    "api_key": "sk-ant-api03-dumm-key-for-testing",
-    "base_url": "https://api.anthropic.com/v1/messages",
+    "provider": "demo",
+    "model": "demo",
+    "api_key": "",
+    "base_url": "",
     "max_tokens": 2000
   },
   "caldav": {

@@ -15,7 +15,7 @@ async def test_enhanced_assistant():
     print("=" * 50)
 
     # Use demo config to avoid API requirements
-    assistant = EnhancedPersonalAssistant("demo_config.json")
+    assistant = EnhancedPersonalAssistant(config_file="enhanced_config.json", data_dir="test_data")
 
     test_commands = [
         "/help",

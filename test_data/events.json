@@ -1,0 +1,15 @@
+[
+  {
+    "title": "Meeting with Sarah",
+    "start_time": "2025-09-28T15:00:00",
+    "end_time": "2025-09-28T16:00:00",
+    "description": "Demo meeting event",
+    "location": "Conference Room",
+    "attendees": [],
+    "uid": "cc2a4e50-fb87-4a00-a036-bf75201384d2",
+    "recurring": false,
+    "recurrence_rule": null,
+    "created_at": "2025-09-27T07:35:35.242566",
+    "updated_at": "2025-09-27T07:35:35.242566"
+  }
+]

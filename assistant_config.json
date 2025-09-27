@@ -1,19 +1,20 @@
 {
+  "llm": {
+    "provider": "demo",
+    "model": "demo",
+    "api_key": "",
+    "base_url": "",
+    "max_tokens": 2000
+  },
   "caldav": {
-    "url": "https://your-caldav-server.com/dav/",
-    "username": "your_username",
-    "password": "your_password"
+    "url": "",
+    "username": "",
+    "password": ""
   },
   "carddav": {
-    "url": "https://your-carddav-server.com/dav/",
-    "username": "your_username", 
-    "password": "your_password"
-  },
-  "llm": {
-    "provider": "openai",
-    "model": "gpt-4",
-    "api_key": "your_openai_api_key",
-    "base_url": "https://api.openai.com/v1"
+    "url": "",
+    "username": "",
+    "password": ""
   },
   "preferences": {
     "default_calendar": "Personal",

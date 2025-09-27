@@ -7,16 +7,16 @@ services:
     restart: unless-stopped
     volumes:
       - ./data:/app/data
-      - ./enhanced_config.json:/app/enhanced_config.json:ro
+      - ./config:/app/config
       - ~/Downloads:/app/watch/downloads:ro
       - ~/Documents:/app/watch/documents:ro
     ports:
-      - "8000:8000"
+      - "8080:8000"
     environment:
       - PYTHONUNBUFFERED=1
     stdin_open: true
     tty: true
-    command: ["python", "enhanced_personal_assistant.py"]
+    command: ["python", "enhanced_personal_assistant.py", "--config", "/app/config/enhanced_config.json"]
 
   # Optional: Local Ollama for privacy-focused LLM
   ollama:

@@ -118,8 +118,17 @@ class OpenAIProvider(LLMProvider):
                 max_tokens=self.config.get("max_tokens", 2000)
             )
             return response.choices[0].message.content
+        except openai.APIError as e:
+            logger.error(f"OpenAI API error: {e.status_code} - {e.response}")
+            raise
+        except openai.APITimeoutError as e:
+            logger.error(f"OpenAI API timeout error: {e}")
+            raise
+        except openai.AuthenticationError as e:
+            logger.error(f"OpenAI authentication error: {e}")
+            raise
         except Exception as e:
-            logger.error(f"OpenAI API error: {e}")
+            logger.error(f"Unexpected OpenAI error: {e.__class__.__name__}: {e}")
             raise
 
 class OllamaProvider(LLMProvider):
@@ -151,8 +160,14 @@ class OllamaProvider(LLMProvider):
             )
             response.raise_for_status()
             return response.json()["response"]
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Ollama HTTP error: {e.response.status_code} - {e.response.text}")
+            raise
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Ollama connection error: {e}")
+            raise
         except Exception as e:
-            logger.error(f"Ollama API error: {e}")
+            logger.error(f"Unexpected Ollama error: {e.__class__.__name__}: {e}")
             raise
 
 class AnthropicProvider(LLMProvider):
@@ -183,8 +198,14 @@ class AnthropicProvider(LLMProvider):
             response = requests.post(self.base_url, headers=headers, json=data, timeout=60)
             response.raise_for_status()
             return response.json()["content"][0]["text"]
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Anthropic HTTP error: {e.response.status_code} - {e.response.text}")
+            raise
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Anthropic connection error: {e}")
+            raise
         except Exception as e:
-            logger.error(f"Anthropic API error: {e}")
+            logger.error(f"Unexpected Anthropic error: {e.__class__.__name__}: {e}")
             raise
 
 class DemoProvider(LLMProvider):
@@ -414,6 +435,9 @@ class EnhancedPersonalAssistant:
             with open(config_file, 'w') as f:
                 json.dump(default_config, f, indent=2)
             return default_config
+        except Exception as e:
+            logger.error(f"Failed to load config file {config_file}: {e.__class__.__name__}: {e}")
+            raise
     
     def _deep_merge(self, default: Dict, user: Dict):
         """Deep merge user config into default config"""
@@ -450,8 +474,12 @@ class EnhancedPersonalAssistant:
                     password=caldav_config["password"]
                 )
                 logger.info("✓ Connected to CalDAV server")
+            except caldav.lib.error.AuthorizationError:
+                logger.warning("Could not connect to CalDAV: Invalid username or password.")
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Could not connect to CalDAV: Network or connection error: {e}")
             except Exception as e:
-                logger.warning(f"Could not connect to CalDAV: {e}")
+                logger.warning(f"Could not connect to CalDAV: Unexpected error: {e.__class__.__name__}: {e}")
     
     def connect_carddav(self):
         """Connect to CardDAV server"""
@@ -464,8 +492,12 @@ class EnhancedPersonalAssistant:
                     password=carddav_config["password"]
                 )
                 logger.info("✓ Connected to CardDAV server")
+            except caldav.lib.error.AuthorizationError:
+                logger.warning("Could not connect to CardDAV: Invalid username or password.")
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Could not connect to CardDAV: Network or connection error: {e}")
             except Exception as e:
-                logger.warning(f"Could not connect to CardDAV: {e}")
+                logger.warning(f"Could not connect to CardDAV: Unexpected error: {e.__class__.__name__}: {e}")
     
     def discover_calendars(self):
         """Discover available calendars"""
@@ -480,8 +512,10 @@ class EnhancedPersonalAssistant:
                 name = calendar.name or "Unnamed Calendar"
                 self.calendars[name] = calendar
                 logger.info(f"📅 Found calendar: {name}")
-        except Exception as e:
-            logger.error(f"Error discovering calendars: {e}")
+            except caldav.lib.error.NotFoundError:
+                logger.error("Error discovering calendars: Principal or calendar collection not found.")
+            except Exception as e:
+                logger.error(f"Error discovering calendars: Unexpected error: {e.__class__.__name__}: {e}")
     
     def discover_address_books(self):
         """Discover available address books"""
@@ -496,8 +530,10 @@ class EnhancedPersonalAssistant:
                 name = ab.name or "Unnamed Address Book"
                 self.address_books[name] = ab
                 logger.info(f"📇 Found address book: {name}")
-        except Exception as e:
-            logger.error(f"Error discovering address books: {e}")
+            except caldav.lib.error.NotFoundError:
+                logger.error("Error discovering address books: Principal or address book collection not found.")
+            except Exception as e:
+                logger.error(f"Error discovering address books: Unexpected error: {e.__class__.__name__}: {e}")
     
     def setup_file_monitoring(self):
         """Setup file system monitoring"""
@@ -535,8 +571,10 @@ class EnhancedPersonalAssistant:
             scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
             scheduler_thread.start()
             logger.info("⏰ Scheduled tasks initialized")
+        except ValueError as e:
+            logger.error(f"Failed to setup scheduled tasks: Invalid time format in configuration: {e}")
         except Exception as e:
-            logger.error(f"Failed to setup scheduled tasks: {e}")
+            logger.error(f"Failed to setup scheduled tasks: Unexpected error: {e.__class__.__name__}: {e}")
     
     async def extract_information_with_llm(self, user_input: str) -> Dict:
         """Use LLM to extract comprehensive information from natural language"""
@@ -691,8 +729,11 @@ Rules:
             logger.info(f"✓ Created event: {event.title} at {event.start_time.strftime('%Y-%m-%d %H:%M')}")
             return True
             
+        except dateutil.parser._parser.ParserError as e:
+            logger.error(f"Error parsing date for event: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Error creating event: {e}")
+            logger.error(f"Error creating event: {e.__class__.__name__}: {e}")
             return False
     
     def sync_event_to_caldav(self, event: CalendarEvent):
@@ -722,8 +763,12 @@ Rules:
             cal.add_component(ical_event)
             calendar.add_event(cal.to_ical().decode('utf-8'))
             
-        except Exception as e:
-            logger.error(f"Error syncing event to CalDAV: {e}")
+            except caldav.lib.error.NotFoundError:
+                logger.error("Error syncing event to CalDAV: Target calendar not found.")
+            except caldav.lib.error.ReportError as e:
+                logger.error(f"Error syncing event to CalDAV: CalDAV report error: {e}")
+            except Exception as e:
+                logger.error(f"Error syncing event to CalDAV: Unexpected error: {e.__class__.__name__}: {e}")
     
     def create_todo(self, todo_data: Dict) -> bool:
         """Create enhanced todo item"""
@@ -744,8 +789,11 @@ Rules:
             logger.info(f"✅ Created todo: {todo.title}")
             return True
             
+        except dateutil.parser._parser.ParserError as e:
+            logger.error(f"Error parsing date for todo: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Error creating todo: {e}")
+            logger.error(f"Error creating todo: {e.__class__.__name__}: {e}")
             return False
     
     def create_contact(self, contact_data: Dict) -> bool:
@@ -772,8 +820,11 @@ Rules:
             logger.info(f"📇 Created contact: {contact.name}")
             return True
             
+        except ValueError as e:
+            logger.error(f"Error validating contact data: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Error creating contact: {e}")
+            logger.error(f"Error creating contact: {e.__class__.__name__}: {e}")
             return False
     
     def sync_contact_to_carddav(self, contact: Contact):
@@ -813,31 +864,43 @@ Rules:
             
             address_book.add_contact(vcard.serialize())
             
-        except Exception as e:
-            logger.error(f"Error syncing contact to CardDAV: {e}")
+            except caldav.lib.error.NotFoundError:
+                logger.error("Error syncing contact to CardDAV: Target address book not found.")
+            except caldav.lib.error.ReportError as e:
+                logger.error(f"Error syncing contact to CardDAV: CardDAV report error: {e}")
+            except Exception as e:
+                logger.error(f"Error syncing contact to CardDAV: Unexpected error: {e.__class__.__name__}: {e}")
     
-    def load_events(self) -> List[CalendarEvent]:
-        """Load events from file"""
-        try:
-            with open(self.events_file, 'r') as f:
-                data = json.load(f)
-            return [
-                CalendarEvent(
-                    title=item['title'],
-                    start_time=datetime.fromisoformat(item['start_time']),
-                    end_time=datetime.fromisoformat(item['end_time']) if item.get('end_time') else None,
-                    description=item.get('description', ''),
-                    location=item.get('location', ''),
-                    attendees=item.get('attendees', []),
-                    uid=item.get('uid'),
-                    recurring=item.get('recurring', False),
-                    recurrence_rule=item.get('recurrence_rule'),
-                    created_at=datetime.fromisoformat(item['created_at']) if item.get('created_at') else None,
-                    updated_at=datetime.fromisoformat(item['updated_at']) if item.get('updated_at') else None
-                )
-                for item in data
-            ]
-        except FileNotFoundError:
+        def load_events(self) -> List[CalendarEvent]:
+            """Load events from file"""
+            try:
+                with open(self.events_file, 'r') as f:
+                    data = json.load(f)
+                return [
+                    CalendarEvent(
+                        title=item['title'],
+                        start_time=datetime.fromisoformat(item['start_time']),
+                        end_time=datetime.fromisoformat(item['end_time']) if item.get('end_time') else None,
+                        description=item.get('description', ''),
+                        location=item.get('location', ''),
+                        attendees=item.get('attendees', []),
+                        uid=item.get('uid'),
+                        recurring=item.get('recurring', False),
+                        recurrence_rule=item.get('recurrence_rule'),
+                        created_at=datetime.fromisoformat(item['created_at']) if item.get('created_at') else None,
+                        updated_at=datetime.fromisoformat(item['updated_at']) if item.get('updated_at') else None
+                    )
+                    for item in data
+                ]
+            except FileNotFoundError:
+                return []        except PermissionError:
+            logger.error(f"Permission denied when trying to read {self.events_file}")
+            return []
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding JSON from {self.events_file}: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error loading events from {self.events_file}: {e.__class__.__name__}: {e}")
             return []
     
     def save_events(self):
@@ -858,8 +921,15 @@ Rules:
             }
             for event in self.events
         ]
-        with open(self.events_file, 'w') as f:
-            json.dump(data, f, indent=2)
+        try:
+            with open(self.events_file, 'w') as f:
+                json.dump(data, f, indent=2)
+        except PermissionError:
+            logger.error(f"Permission denied when trying to write to {self.events_file}")
+        except IOError as e:
+            logger.error(f"I/O error when writing to {self.events_file}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error saving events to {self.events_file}: {e.__class__.__name__}: {e}")
     
     def load_todos(self) -> List[TodoItem]:
         """Load todos from file"""
@@ -882,6 +952,15 @@ Rules:
             ]
         except FileNotFoundError:
             return []
+        except PermissionError:
+            logger.error(f"Permission denied when trying to read {self.todos_file}")
+            return []
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding JSON from {self.todos_file}: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error loading todos from {self.todos_file}: {e.__class__.__name__}: {e}")
+            return []
     
     def save_todos(self):
         """Save todos to file"""
@@ -899,8 +978,15 @@ Rules:
             }
             for todo in self.todos
         ]
-        with open(self.todos_file, 'w') as f:
-            json.dump(data, f, indent=2)
+        try:
+            with open(self.todos_file, 'w') as f:
+                json.dump(data, f, indent=2)
+        except PermissionError:
+            logger.error(f"Permission denied when trying to write to {self.todos_file}")
+        except IOError as e:
+            logger.error(f"I/O error when writing to {self.todos_file}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error saving todos to {self.todos_file}: {e.__class__.__name__}: {e}")
     
     def load_contacts(self) -> List[Contact]:
         """Load contacts from file"""
@@ -922,6 +1008,15 @@ Rules:
             ]
         except FileNotFoundError:
             return []
+        except PermissionError:
+            logger.error(f"Permission denied when trying to read {self.contacts_file}")
+            return []
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding JSON from {self.contacts_file}: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error loading contacts from {self.contacts_file}: {e.__class__.__name__}: {e}")
+            return []
     
     def save_contacts(self):
         """Save contacts to file"""
@@ -938,8 +1033,15 @@ Rules:
             }
             for contact in self.contacts
         ]
-        with open(self.contacts_file, 'w') as f:
-            json.dump(data, f, indent=2)
+        try:
+            with open(self.contacts_file, 'w') as f:
+                json.dump(data, f, indent=2)
+        except PermissionError:
+            logger.error(f"Permission denied when trying to write to {self.contacts_file}")
+        except IOError as e:
+            logger.error(f"I/O error when writing to {self.contacts_file}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error saving contacts to {self.contacts_file}: {e.__class__.__name__}: {e}")
     
     def get_upcoming_events(self, days: int = 7) -> List[CalendarEvent]:
         """Get upcoming events"""
@@ -1030,9 +1132,15 @@ Keep it under 200 words and make it actionable."""
             logger.info(f"📊 Generated daily summary for {today}")
             return summary
             
-        except Exception as e:
-            logger.error(f"Error generating daily summary: {e}")
-            return None
+            except PermissionError:
+                logger.error(f"Permission denied when trying to write daily summary to {summary_file}")
+                return None
+            except IOError as e:
+                logger.error(f"I/O error when writing daily summary to {summary_file}: {e}")
+                return None
+            except Exception as e:
+                logger.error(f"Error generating daily summary: {e.__class__.__name__}: {e}")
+                return None
     
     def cleanup_old_data(self):
         """Clean up old data"""
@@ -1234,45 +1342,52 @@ async def main():
     
     try:
         assistant = EnhancedPersonalAssistant()
-        print("\n✓ Enhanced Assistant ready!")
-        print("🧠 LLM-powered natural language processing")
-        print("📊 File monitoring and daily summaries")
-        print("🔄 CalDAV/CardDAV sync capabilities")
-        print("\nType /help for commands or just talk naturally")
-        print("Type 'quit' to exit\n")
-        
-        while True:
-            try:
-                user_input = input("You: ").strip()
-                
-                if user_input.lower() in ['quit', 'exit', 'bye']:
-                    print("👋 Goodbye!")
-                    # Cleanup
-                    if hasattr(assistant, 'observer'):
-                        assistant.observer.stop()
-                        assistant.observer.join()
-                    break
-                
-                if not user_input:
-                    continue
-                
-                response = await assistant.process_input(user_input)
-                print(f"Assistant: {response}\n")
-                
-            except KeyboardInterrupt:
-                print("\n👋 Goodbye!")
+    except Exception as e:
+        logger.error(f"Failed to initialize assistant: {e.__class__.__name__}: {e}")
+        print(f"❌ Failed to initialize assistant: {e}")
+        print("\nPlease check your configuration and dependencies.")
+        return
+
+    print("\n✓ Enhanced Assistant ready!")
+    print("🧠 LLM-powered natural language processing")
+    print("📊 File monitoring and daily summaries")
+    print("🔄 CalDAV/CardDAV sync capabilities")
+    print("\nType /help for commands or just talk naturally")
+    print("Type 'quit' to exit\n")
+    
+    while True:
+        try:
+            user_input = input("You: ").strip()
+            
+            if user_input.lower() in ['quit', 'exit', 'bye']:
+                print("👋 Goodbye!")
+                # Cleanup
                 if hasattr(assistant, 'observer'):
                     assistant.observer.stop()
                     assistant.observer.join()
                 break
-            except Exception as e:
-                logger.error(f"Error in main loop: {e}")
-                print(f"❌ Error: {e}")
-    
-    except Exception as e:
-        logger.error(f"Failed to initialize assistant: {e}")
-        print(f"❌ Failed to initialize assistant: {e}")
-        print("\nPlease check your configuration and dependencies.")
+            
+            if not user_input:
+                continue
+            
+            response = await assistant.process_input(user_input)
+            print(f"Assistant: {response}\n")
+            
+        except KeyboardInterrupt:
+            print("\n👋 Goodbye!")
+            if hasattr(assistant, 'observer'):
+                assistant.observer.stop()
+                assistant.observer.join()
+            break
+        except EOFError:
+            print("\n👋 Goodbye!")
+            if hasattr(assistant, 'observer'):
+                assistant.observer.stop()
+                assistant.observer.join()
+            break
+        except Exception as e:
+            logger.error(f"Error in main loop: {e}")
+            print(f"❌ Error: {e}")
 
 if __name__ == "__main__":
     asyncio.run(main())

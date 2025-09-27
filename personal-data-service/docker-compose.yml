@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  personal-service:
+    build: .
+    container_name: personal-data-service
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_PATH=/data/personal.db
+      - FILES_ROOT=/data/files
+      - DEFAULT_LLM=anthropic
+      - REMINDER_CHECK_MINUTES=5
+      - DAILY_REVIEW_HOUR=8
+      - TIMEZONE=UTC
+      # Add your API keys here or use .env file
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Optional: Add a backup service
+  backup:
+    image: alpine:latest
+    container_name: personal-data-backup
+    volumes:
+      - ./data:/data:ro
+      - ./backups:/backups
+    command: |
+      sh -c "
+        echo 'Setting up backup cron job...'
+        echo '0 2 * * * cp /data/personal.db /backups/personal-$(date +%Y%m%d).db && find /backups -name '*.db' -mtime +7 -delete' | crontab -
+        crond -f
+      "
+    restart: unless-stopped
+    profiles:
+      - backup
+
+volumes:
+  data:
+  logs:
+  backups:
