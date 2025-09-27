@@ -1,0 +1,50 @@
+{
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-3-sonnet-20240229",
+    "api_key": "sk-ant-api03-your_claude_api_key_here",
+    "base_url": "https://api.anthropic.com/v1/messages",
+    "max_tokens": 2000
+  },
+  "caldav": {
+    "url": "https://your-caldav-server.com/dav/",
+    "username": "your_username",
+    "password": "your_password"
+  },
+  "carddav": {
+    "url": "https://your-carddav-server.com/dav/",
+    "username": "your_username",
+    "password": "your_password"
+  },
+  "monitoring": {
+    "watch_directories": [
+      "~/Downloads",
+      "~/Documents",
+      "~/Desktop"
+    ],
+    "file_extensions": [
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".txt",
+      ".md",
+      ".png",
+      ".jpg",
+      ".jpeg"
+    ],
+    "daily_summary_time": "18:00"
+  },
+  "preferences": {
+    "default_calendar": "Personal",
+    "default_event_duration": 60,
+    "timezone": "UTC",
+    "auto_categorize": true,
+    "smart_suggestions": true
+  },
+  "integrations": {
+    "email_enabled": false,
+    "email_server": "",
+    "web_interface": true,
+    "api_enabled": true
+  }
+}

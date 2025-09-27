@@ -187,6 +187,107 @@ class AnthropicProvider(LLMProvider):
             logger.error(f"Anthropic API error: {e}")
             raise
 
+class DemoProvider(LLMProvider):
+    """Demo provider for testing without API keys"""
+
+    def __init__(self, config: Dict):
+        super().__init__(config)
+
+    async def generate_response(self, prompt: str, system_prompt: str = "") -> str:
+        """Generate demo responses using simple pattern matching"""
+        prompt_lower = prompt.lower()
+        from datetime import datetime, timedelta
+        import json
+
+        if "meeting" in prompt_lower or "appointment" in prompt_lower:
+            # Extract basic info from prompt
+            title = "Meeting"
+            if "with" in prompt_lower:
+                parts = prompt_lower.split("with")
+                if len(parts) > 1:
+                    name_part = parts[1].split()[0]
+                    title = f"Meeting with {name_part.title()}"
+
+            tomorrow = datetime.now() + timedelta(days=1)
+            tomorrow_3pm = tomorrow.replace(hour=15, minute=0, second=0, microsecond=0)
+
+            return json.dumps({
+                "calendar_events": [{
+                    "title": title,
+                    "start_time": tomorrow_3pm.isoformat(),
+                    "end_time": (tomorrow_3pm + timedelta(hours=1)).isoformat(),
+                    "description": "Demo meeting event",
+                    "location": "Conference Room" if "conference" in prompt_lower else ""
+                }],
+                "todos": [],
+                "contacts": [],
+                "file_actions": [],
+                "queries": [],
+                "response": "📅 I've created a meeting event for you. This is a demo response - the meeting has been added to your local storage."
+            })
+        elif "remind" in prompt_lower or "todo" in prompt_lower:
+            title = "Call the bank"
+            if "call" in prompt_lower and "bank" in prompt_lower:
+                title = "Call the bank"
+            elif "remind me to" in prompt_lower:
+                start = prompt_lower.find("remind me to") + 12
+                title = prompt[start:].strip()
+
+            due_date = datetime.now() + timedelta(days=5) # Next Tuesday
+            due_date = due_date.replace(hour=9, minute=0, second=0, microsecond=0)
+
+            return json.dumps({
+                "calendar_events": [],
+                "todos": [{
+                    "title": title.title(),
+                    "description": "Demo todo item",
+                    "due_date": due_date.isoformat(),
+                    "priority": "normal"
+                }],
+                "contacts": [],
+                "file_actions": [],
+                "queries": [],
+                "response": "✅ I've added that as a todo item. This is a demo response - the task has been saved locally."
+            })
+        elif "contact" in prompt_lower and ("add" in prompt_lower or "create" in prompt_lower):
+            name = "John Doe"
+            email = ""
+            phone = ""
+
+            if "john doe" in prompt_lower:
+                name = "John Doe"
+            if "@" in prompt:
+                email_start = prompt.lower().find("email")
+                if email_start > -1:
+                    email_part = prompt[email_start:].split()[1] if " " in prompt[email_start:] else ""
+                    if "@" in email_part:
+                        email = email_part.rstrip(",")
+            if "phone" in prompt_lower:
+                phone = "+1234567890"
+
+            return json.dumps({
+                "calendar_events": [],
+                "todos": [],
+                "contacts": [{
+                    "name": name,
+                    "email": email,
+                    "phone": phone,
+                    "company": "Demo Company"
+                }],
+                "file_actions": [],
+                "queries": [],
+                "response": "📇 I've added the contact information. This is a demo response - the contact has been saved locally."
+            })
+        else:
+            return json.dumps({
+                "calendar_events": [],
+                "todos": [],
+                "contacts": [],
+                "file_actions": [],
+                "queries": [],
+                "response": f"I understand you said: '{prompt}'. This is a demo response from the Enhanced Personal Assistant. In full mode, I would use AI to provide intelligent responses and actions."
+            })
+
 class FileMonitor(FileSystemEventHandler):
     """Monitor file system changes"""
     
@@ -333,6 +434,8 @@ class EnhancedPersonalAssistant:
             return OllamaProvider(llm_config)
         elif provider_name == "anthropic":
             return AnthropicProvider(llm_config)
+        elif provider_name == "demo":
+            return DemoProvider(llm_config)
         else:
             raise ValueError(f"Unsupported LLM provider: {provider_name}")
     

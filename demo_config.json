@@ -1,0 +1,42 @@
+{
+  "llm": {
+    "provider": "demo",
+    "model": "demo-model",
+    "api_key": "demo-key",
+    "base_url": "",
+    "max_tokens": 2000
+  },
+  "caldav": {
+    "url": "",
+    "username": "",
+    "password": ""
+  },
+  "carddav": {
+    "url": "",
+    "username": "",
+    "password": ""
+  },
+  "monitoring": {
+    "watch_directories": [
+      "./test_watch"
+    ],
+    "file_extensions": [
+      ".txt",
+      ".md"
+    ],
+    "daily_summary_time": "18:00"
+  },
+  "preferences": {
+    "default_calendar": "Personal",
+    "default_event_duration": 60,
+    "timezone": "UTC",
+    "auto_categorize": true,
+    "smart_suggestions": true
+  },
+  "integrations": {
+    "email_enabled": false,
+    "email_server": "",
+    "web_interface": true,
+    "api_enabled": true
+  }
+}
