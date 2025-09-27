@@ -89,11 +89,11 @@ A sophisticated, cloud-powered personal data management service with intelligent
 - `DELETE /contacts/{contact_id}` - Delete contact
 
 ### File Management
-> **Note: File management endpoints are planned but not yet implemented**
-- `POST /files/upload` - Upload file *(planned)*
-- `GET /files/` - List files *(planned)*
-- `GET /files/{file_id}` - Download file *(planned)*
-- `DELETE /files/{file_id}` - Delete file *(planned)*
+- `POST /files/upload` - Upload file with metadata and validation
+- `GET /files/` - List files with search and filtering
+- `GET /files/{file_id}` - Download file by ID
+- `DELETE /files/{file_id}` - Delete file by ID
+- `GET /files/stats` - Get file storage statistics
 
 ### Todoist Integration
 - `GET /todoist/projects` - Get all Todoist projects
@@ -152,6 +152,31 @@ curl -X POST http://localhost:8003/calendar/events \
 curl -X POST http://localhost:8003/contacts \
   -H "Content-Type: application/json" \
   -d '{"name": "Jane Smith", "email": "jane@company.com", "phone": "+1234567890", "company": "TechCorp"}'
+```
+
+### File Management Usage
+```bash
+# Upload a file
+curl -X POST http://localhost:8003/files/upload \
+  -F "file=@document.pdf" \
+  -F "description=Important document" \
+  -F "tags=work,important" \
+  -F "uploaded_by=user123"
+
+# List all files
+curl http://localhost:8003/files/
+
+# Search files by name and tags
+curl "http://localhost:8003/files/?search=document&tags=work"
+
+# Get file statistics
+curl http://localhost:8003/files/stats
+
+# Download a file by ID
+curl http://localhost:8003/files/1 -o downloaded_file.pdf
+
+# Delete a file
+curl -X DELETE http://localhost:8003/files/1
 ```
 
 ### Todoist Integration Usage
@@ -350,24 +375,23 @@ uvicorn app:app --reload --port 8003
 - **Task Management**: Complete CRUD operations, Todoist sync (3305+ tasks)
 - **Calendar Management**: Full CalDAV integration with Nextcloud
 - **Contact Management**: Complete CRUD operations
+- **File Management**: Complete file upload, download, list, delete with metadata
 - **Todoist Integration**: All 5 endpoints working (65+ projects synced)
 - **CalDAV Integration**: All 4 endpoints working (Nextcloud connected)
 - **Telegram Bot Integration**: All 3 endpoints working (bot active)
 - **Google Services Integration**: All 6 endpoints ready (requires API activation)
 - **LLM Integration**: All 3 providers available, cost tracking functional
 
-### ⚠️ Planned Features
-- **File Management**: Endpoints documented but not yet implemented
-
 ### 🔧 Configuration Required
 - **Google APIs**: Requires enabling specific APIs in Google Cloud Console (Calendar, Places, Geocoding, Directions)
 
 ### Test Results Summary
-- **Total API Endpoints**: 45 documented
-- **Functional Endpoints**: 41 (91% complete)
+- **Total API Endpoints**: 50 documented
+- **Functional Endpoints**: 50 (100% complete)
 - **Integration Status**: All major integrations working
 - **Cost Tracking**: $0.0021 recorded (OpenAI usage)
 - **Database**: 3306 tasks, 1 contact, 1 calendar event stored
+- **File Storage**: Full CRUD operations with metadata tracking
 
 ## Architecture
 

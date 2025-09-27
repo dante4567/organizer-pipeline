@@ -4,8 +4,9 @@ Cloud-Powered Personal Data Management Service
 Advanced LLM integration with intelligent routing and cost tracking
 """
 
-from fastapi import FastAPI, HTTPException, Query, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Query, Depends, BackgroundTasks, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, Field, validator
 from typing import List, Dict, Any, Optional, Union, Literal
@@ -1182,11 +1183,232 @@ class ContactService:
             updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None
         )
 
+# File Management Service
+class FileService:
+    """File management service for upload, download, and organization"""
+
+    def __init__(self, db_manager: DatabaseManager, files_root: str):
+        self.db_manager = db_manager
+        self.files_root = Path(files_root)
+        self.files_root.mkdir(parents=True, exist_ok=True)
+        self._init_file_table()
+
+    def _init_file_table(self):
+        """Initialize the files table"""
+        conn = self.db_manager.get_connection()
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS files (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    filename TEXT NOT NULL,
+                    original_filename TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    file_size INTEGER NOT NULL,
+                    content_type TEXT,
+                    description TEXT,
+                    tags TEXT DEFAULT '[]',
+                    uploaded_by TEXT,
+                    metadata TEXT DEFAULT '{}',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+        finally:
+            conn.close()
+
+    async def upload_file(self, file_content: bytes, filename: str, content_type: str = None,
+                         description: str = None, uploaded_by: str = None, tags: List[str] = None) -> Dict:
+        """Upload a file and store metadata"""
+        try:
+            # Generate unique filename
+            file_id = str(uuid.uuid4())
+            file_extension = Path(filename).suffix
+            unique_filename = f"{file_id}{file_extension}"
+            file_path = self.files_root / unique_filename
+
+            # Write file to disk
+            with open(file_path, 'wb') as f:
+                f.write(file_content)
+
+            # Store metadata in database
+            conn = self.db_manager.get_connection()
+            try:
+                cursor = conn.execute("""
+                    INSERT INTO files (filename, original_filename, file_path, file_size,
+                                     content_type, description, tags, uploaded_by, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    unique_filename,
+                    filename,
+                    str(file_path),
+                    len(file_content),
+                    content_type or "application/octet-stream",
+                    description,
+                    json.dumps(tags or []),
+                    uploaded_by,
+                    json.dumps({
+                        "upload_timestamp": datetime.now().isoformat(),
+                        "file_hash": hashlib.md5(file_content).hexdigest()
+                    })
+                ))
+                conn.commit()
+                file_db_id = cursor.lastrowid
+
+                return {
+                    "file_id": file_db_id,
+                    "filename": unique_filename,
+                    "original_filename": filename,
+                    "file_size": len(file_content),
+                    "content_type": content_type,
+                    "description": description,
+                    "tags": tags or [],
+                    "uploaded_at": datetime.now().isoformat()
+                }
+            finally:
+                conn.close()
+
+        except Exception as e:
+            # Clean up file if database insert fails
+            if file_path.exists():
+                file_path.unlink()
+            raise Exception(f"File upload failed: {e}")
+
+    def list_files(self, limit: int = 100, search: str = None, tags: List[str] = None) -> List[Dict]:
+        """List files with optional search and filtering"""
+        conn = self.db_manager.get_connection()
+        try:
+            query = """
+                SELECT id, filename, original_filename, file_size, content_type,
+                       description, tags, uploaded_by, created_at, updated_at
+                FROM files
+            """
+            params = []
+
+            if search:
+                query += " WHERE (original_filename LIKE ? OR description LIKE ?)"
+                params.extend([f"%{search}%", f"%{search}%"])
+
+            if tags:
+                if search:
+                    query += " AND"
+                else:
+                    query += " WHERE"
+                query += " (" + " OR ".join(["tags LIKE ?" for _ in tags]) + ")"
+                params.extend([f"%{tag}%" for tag in tags])
+
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(limit)
+
+            rows = conn.execute(query, params).fetchall()
+
+            files = []
+            for row in rows:
+                files.append({
+                    "id": row["id"],
+                    "filename": row["filename"],
+                    "original_filename": row["original_filename"],
+                    "file_size": row["file_size"],
+                    "content_type": row["content_type"],
+                    "description": row["description"],
+                    "tags": json.loads(row["tags"]),
+                    "uploaded_by": row["uploaded_by"],
+                    "created_at": row["created_at"],
+                    "updated_at": row["updated_at"]
+                })
+
+            return files
+        finally:
+            conn.close()
+
+    def get_file(self, file_id: int) -> Dict:
+        """Get file metadata and path"""
+        conn = self.db_manager.get_connection()
+        try:
+            row = conn.execute("""
+                SELECT id, filename, original_filename, file_path, file_size, content_type,
+                       description, tags, uploaded_by, metadata, created_at, updated_at
+                FROM files WHERE id = ?
+            """, (file_id,)).fetchone()
+
+            if not row:
+                raise ValueError(f"File with ID {file_id} not found")
+
+            file_path = Path(row["file_path"])
+            if not file_path.exists():
+                raise ValueError(f"File {row['filename']} not found on disk")
+
+            return {
+                "id": row["id"],
+                "filename": row["filename"],
+                "original_filename": row["original_filename"],
+                "file_path": str(file_path),
+                "file_size": row["file_size"],
+                "content_type": row["content_type"],
+                "description": row["description"],
+                "tags": json.loads(row["tags"]),
+                "uploaded_by": row["uploaded_by"],
+                "metadata": json.loads(row["metadata"]),
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"]
+            }
+        finally:
+            conn.close()
+
+    def delete_file(self, file_id: int) -> bool:
+        """Delete file from disk and database"""
+        conn = self.db_manager.get_connection()
+        try:
+            # Get file info first
+            row = conn.execute("SELECT file_path FROM files WHERE id = ?", (file_id,)).fetchone()
+            if not row:
+                return False
+
+            # Delete from database
+            cursor = conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
+            conn.commit()
+
+            if cursor.rowcount == 0:
+                return False
+
+            # Delete file from disk
+            file_path = Path(row["file_path"])
+            if file_path.exists():
+                file_path.unlink()
+
+            return True
+        finally:
+            conn.close()
+
+    def get_storage_stats(self) -> Dict:
+        """Get file storage statistics"""
+        conn = self.db_manager.get_connection()
+        try:
+            stats = conn.execute("""
+                SELECT
+                    COUNT(*) as total_files,
+                    SUM(file_size) as total_size,
+                    AVG(file_size) as avg_size,
+                    MAX(file_size) as max_size
+                FROM files
+            """).fetchone()
+
+            return {
+                "total_files": stats["total_files"] or 0,
+                "total_size_bytes": stats["total_size"] or 0,
+                "total_size_mb": round((stats["total_size"] or 0) / (1024 * 1024), 2),
+                "average_file_size_bytes": round(stats["avg_size"] or 0, 2),
+                "largest_file_bytes": stats["max_size"] or 0
+            }
+        finally:
+            conn.close()
+
 # Initialize services
 db_manager = DatabaseManager(DB_PATH)
 calendar_service = CalendarService(db_manager)
 task_service = TaskService(db_manager)
 contact_service = ContactService(db_manager)
+file_service = FileService(db_manager, FILES_ROOT)
 llm_service = CloudLLMService()
 
 # Scheduler for background tasks
@@ -2410,6 +2632,123 @@ async def send_telegram_message(chat_id: str, message: str):
         return {"message": "Message sent successfully" if success else "Failed to send message", "success": success}
     except Exception as e:
         logger.error(f"Error sending Telegram message: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# File Management API endpoints
+@app.post("/files/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    description: Optional[str] = Query(None, description="File description"),
+    tags: Optional[str] = Query(None, description="Comma-separated tags"),
+    uploaded_by: Optional[str] = Query(None, description="Uploader identifier")
+):
+    """Upload a file with metadata"""
+    try:
+        # Validate file size (max 100MB)
+        max_size = 100 * 1024 * 1024  # 100MB
+        file_content = await file.read()
+
+        if len(file_content) > max_size:
+            raise HTTPException(status_code=413, detail="File too large (max 100MB)")
+
+        # Validate file type (basic security)
+        allowed_extensions = {'.txt', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+                            '.jpg', '.jpeg', '.png', '.gif', '.csv', '.json', '.xml', '.zip'}
+        file_extension = Path(file.filename).suffix.lower()
+
+        if file_extension not in allowed_extensions:
+            raise HTTPException(status_code=400, detail=f"File type {file_extension} not allowed")
+
+        # Parse tags
+        tag_list = [tag.strip() for tag in tags.split(',')] if tags else []
+
+        # Upload file
+        result = await file_service.upload_file(
+            file_content=file_content,
+            filename=file.filename,
+            content_type=file.content_type,
+            description=description,
+            uploaded_by=uploaded_by,
+            tags=tag_list
+        )
+
+        return {"message": "File uploaded successfully", "file": result}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"File upload error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/files/")
+async def list_files(
+    limit: int = Query(100, description="Maximum number of files to return"),
+    search: Optional[str] = Query(None, description="Search in filename and description"),
+    tags: Optional[str] = Query(None, description="Filter by tags (comma-separated)")
+):
+    """List files with optional search and filtering"""
+    try:
+        tag_list = [tag.strip() for tag in tags.split(',')] if tags else None
+        files = file_service.list_files(limit=limit, search=search, tags=tag_list)
+
+        # Get storage stats
+        stats = file_service.get_storage_stats()
+
+        return {
+            "files": files,
+            "count": len(files),
+            "storage_stats": stats
+        }
+
+    except Exception as e:
+        logger.error(f"File listing error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/files/stats")
+async def get_file_stats():
+    """Get file storage statistics"""
+    try:
+        stats = file_service.get_storage_stats()
+        return {"storage_stats": stats}
+
+    except Exception as e:
+        logger.error(f"File stats error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/files/{file_id}")
+async def download_file(file_id: int):
+    """Download a file by ID"""
+    try:
+        file_info = file_service.get_file(file_id)
+        file_path = file_info["file_path"]
+
+        return FileResponse(
+            path=file_path,
+            filename=file_info["original_filename"],
+            media_type=file_info["content_type"]
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"File download error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/files/{file_id}")
+async def delete_file(file_id: int):
+    """Delete a file by ID"""
+    try:
+        success = file_service.delete_file(file_id)
+
+        if not success:
+            raise HTTPException(status_code=404, detail="File not found")
+
+        return {"message": "File deleted successfully", "file_id": file_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"File deletion error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Google API endpoints
