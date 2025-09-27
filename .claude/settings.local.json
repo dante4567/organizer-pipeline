@@ -37,7 +37,9 @@
       "Bash(cat:*)",
       "Bash(./run_local.sh:*)",
       "Bash(env)",
-      "Read(//nix/store/**)"
+      "Read(//nix/store/**)",
+      "Bash(docker:*)",
+      "Bash(./local_dev.sh:*)"
     ],
     "deny": [],
     "ask": []

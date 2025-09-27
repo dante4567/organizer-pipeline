@@ -14,5 +14,21 @@
     "priority": "normal",
     "completed": false,
     "uid": "e1695010-d27a-484d-9a49-c6bd2334ca51"
+  },
+  {
+    "title": "Call The Bank Next Tuesday",
+    "description": "From: remind me to call the bank next tuesday",
+    "due_date": "2025-09-30T09:00:00",
+    "priority": "normal",
+    "completed": false,
+    "uid": "59af676c-2d21-4bf4-a741-b3b943a326d4"
+  },
+  {
+    "title": "Add John Doe To Contacts,",
+    "description": "From: add john doe to contacts, email john@company.com, phone +1234567890",
+    "due_date": "2025-09-28T09:00:00",
+    "priority": "normal",
+    "completed": false,
+    "uid": "ad4303a0-231c-4e95-9ba1-112e8d38a4e4"
   }
 ]

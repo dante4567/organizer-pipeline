@@ -5,5 +5,12 @@
     "email": "john@company.com",
     "company": null,
     "uid": "acefd86c-dd98-42f1-94d1-35713193cc2f"
+  },
+  {
+    "name": "john doe to contacts",
+    "phone": null,
+    "email": "john@company.com",
+    "company": null,
+    "uid": "7ba2549d-7b71-4f45-a08d-27367c055c2e"
   }
 ]

@@ -9,5 +9,19 @@
     "tags": [],
     "created_at": "2025-09-27T07:35:35.242798",
     "completed_at": null
+  },
+  {
+    "title": "Call the bank",
+    "description": "Phone call to bank",
+    "due_date": "2025-10-01T09:00:00",
+    "priority": "medium",
+    "completed": false,
+    "uid": "05fe41c7-26f4-4dad-93a8-a121a0577af5",
+    "tags": [
+      "personal",
+      "calls"
+    ],
+    "created_at": "2025-09-27T21:44:57.249162",
+    "completed_at": null
   }
 ]
