@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(pip install:*)",
+      "Bash(python3 -m pip install:*)",
+      "Bash(python3:*)",
+      "Bash(nix-shell:*)",
+      "Bash(/usr/bin/python3:*)",
+      "Bash(sudo dnf install:*)",
+      "Bash(docker build:*)",
+      "Bash(docker run:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

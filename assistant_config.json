@@ -1,0 +1,23 @@
+{
+  "caldav": {
+    "url": "https://your-caldav-server.com/dav/",
+    "username": "your_username",
+    "password": "your_password"
+  },
+  "carddav": {
+    "url": "https://your-carddav-server.com/dav/",
+    "username": "your_username", 
+    "password": "your_password"
+  },
+  "llm": {
+    "provider": "openai",
+    "model": "gpt-4",
+    "api_key": "your_openai_api_key",
+    "base_url": "https://api.openai.com/v1"
+  },
+  "preferences": {
+    "default_calendar": "Personal",
+    "default_event_duration": 60,
+    "timezone": "UTC"
+  }
+}
