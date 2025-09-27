@@ -14,9 +14,6 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
-# Create data directory for persistent storage
-RUN mkdir -p /app/data
-
 # Copy requirements first for better Docker layer caching
 COPY requirements.txt .
 
@@ -26,13 +23,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Create data directory with world-writable permissions for cross-platform compatibility
+RUN mkdir -p /app/data && chmod 777 /app/data
+
 # Create volume for persistent data
 VOLUME ["/app/data"]
 
 # Expose port for future web interface
 EXPOSE 8000
-
-# No health check needed for CLI application
 
 # Default command (can be overridden)
 CMD ["python", "enhanced_personal_assistant.py"]

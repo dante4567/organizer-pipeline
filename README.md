@@ -2,16 +2,22 @@
 
 Advanced LLM-powered personal assistant for calendar, todo, and contact management with comprehensive CalDAV/CardDAV integration.
 
-## 🚀 Quick Start (Docker - Recommended)
+## 🚀 Quick Start
 
+### Local Development (Recommended)
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd organizer-pipeline
+# Setup (run once)
+./local_dev.sh
 
+# Run the application
+./run_local.sh
+```
+
+### Docker Alternative
+```bash
 # Build and run with Docker
 docker build -t organizer-pipeline .
-docker run -it --rm -v $(pwd)/data:/app/data organizer-pipeline
+./run.sh
 
 # Or use docker-compose for full setup
 docker-compose up organizer-pipeline
@@ -27,13 +33,14 @@ docker-compose up organizer-pipeline
 - 👁️ **File Monitoring** - Automatic file activity tracking and organization
 - 📊 **Daily Summaries** - AI-generated insights and productivity reports
 
-### LLM Providers Supported
-- **OpenAI GPT** (GPT-4, GPT-3.5-turbo)
-- **Local Ollama** (Llama 2, Mistral, CodeLlama, etc.)
-- **Anthropic Claude** (Claude 3 Sonnet, Haiku)
+### LLM Providers Supported ✅ REAL AI INTEGRATION
+- **Anthropic Claude** (Claude 3.5 Sonnet) - **Active & Configured**
+- **OpenAI GPT** (GPT-4, GPT-3.5-turbo) - **API Key Available**
+- **GROQ** (Llama 3.1 70B, Mixtral) - **Fast & Cost-Effective**
+- **Local Ollama** (Llama 2, Mistral, CodeLlama, etc.) - **Optional**
 
-### Integration Support
-- **CalDAV**: Nextcloud, ownCloud, Apple iCloud, Radicale
+### Integration Support ✅ CLOUD CONNECTED
+- **CalDAV**: cloud.basurgis.de (Active), Nextcloud, ownCloud, Apple iCloud, Radicale
 - **CardDAV**: Same as CalDAV plus dedicated contact servers
 - **File Systems**: Real-time monitoring with intelligent categorization
 - **Multiple Frontends**: Terminal, Web UI (planned), API, Telegram bot (planned)

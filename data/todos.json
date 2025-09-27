@@ -1,0 +1,37 @@
+[
+  {
+    "title": "Call The Bank",
+    "description": "Demo todo item",
+    "due_date": "2025-10-02T09:00:00",
+    "priority": "normal",
+    "completed": false,
+    "uid": "2e31d250-a518-4545-b7ce-204a3995b578",
+    "tags": [],
+    "created_at": "2025-09-27T13:34:31.584972",
+    "completed_at": null
+  },
+  {
+    "title": "Call The Bank",
+    "description": "Demo todo item",
+    "due_date": "2025-10-02T09:00:00",
+    "priority": "normal",
+    "completed": false,
+    "uid": "f0b0b2d5-27b7-470d-838d-4383805a83c6",
+    "tags": [],
+    "created_at": "2025-09-27T13:36:06.669539",
+    "completed_at": null
+  },
+  {
+    "title": "Meet Nadja",
+    "description": "30-minute meeting with Nadja",
+    "due_date": "2025-09-27T16:15:00",
+    "priority": "medium",
+    "completed": false,
+    "uid": "ff40f44c-c1ad-4dff-b238-3c4fc5a082d0",
+    "tags": [
+      "meeting"
+    ],
+    "created_at": "2025-09-27T13:46:54.804387",
+    "completed_at": null
+  }
+]

@@ -25,7 +25,19 @@
       "Bash(docker exec:*)",
       "Bash(python -m pytest test_enhanced.py -v)",
       "Bash(python test:*)",
-      "Bash(docker inspect:*)"
+      "Bash(docker inspect:*)",
+      "Bash(git push:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git remote add:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(python:*)",
+      "Bash(chmod:*)",
+      "Bash(./run.sh:*)",
+      "Bash(source:*)",
+      "Bash(cat:*)",
+      "Bash(./run_local.sh:*)",
+      "Bash(env)",
+      "Read(//nix/store/**)"
     ],
     "deny": [],
     "ask": []
