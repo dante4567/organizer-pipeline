@@ -10,7 +10,11 @@
       "Bash(sudo dnf install:*)",
       "Bash(docker build:*)",
       "Bash(docker run:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Read(//home/danielt/Downloads/**)",
+      "Read(//home/danielt/**)",
+      "Bash(unzip:*)"
     ],
     "deny": [],
     "ask": []

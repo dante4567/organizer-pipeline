@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  organizer-pipeline:
+    build: .
+    container_name: organizer-pipeline
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./enhanced_config.json:/app/enhanced_config.json:ro
+      - ~/Downloads:/app/watch/downloads:ro
+      - ~/Documents:/app/watch/documents:ro
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    stdin_open: true
+    tty: true
+    command: ["python", "enhanced_personal_assistant.py"]
+
+  # Optional: Local Ollama for privacy-focused LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    profiles:
+      - local-llm
+
+  # Optional: Radicale for local CalDAV/CardDAV
+  radicale:
+    image: tomsquest/docker-radicale:latest
+    container_name: radicale
+    restart: unless-stopped
+    ports:
+      - "5232:5232"
+    volumes:
+      - radicale_data:/data
+      - ./config/radicale:/config:ro
+    environment:
+      - TAKE_FILE_OWNERSHIP=false
+    profiles:
+      - local-caldav
+
+volumes:
+  ollama_data:
+  radicale_data:
