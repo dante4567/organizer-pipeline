@@ -5,7 +5,8 @@ No secrets in files - everything from environment.
 
 import os
 from typing import List, Optional
-from pydantic import BaseSettings, Field, validator
+from pydantic_settings import BaseSettings
+from pydantic import Field, field_validator
 from functools import lru_cache
 
 
@@ -36,7 +37,8 @@ class CalDAVSettings(BaseSettings):
     class Config:
         env_prefix = "CALDAV_"
 
-    @validator("url")
+    @field_validator("url")
+    @classmethod
     def validate_url(cls, v):
         """Validate CalDAV URL format."""
         if v and not v.startswith(("http://", "https://")):
@@ -56,7 +58,8 @@ class CardDAVSettings(BaseSettings):
     class Config:
         env_prefix = "CARDDAV_"
 
-    @validator("url")
+    @field_validator("url")
+    @classmethod
     def validate_url(cls, v):
         """Validate CardDAV URL format."""
         if v and not v.startswith(("http://", "https://")):
@@ -82,7 +85,8 @@ class MonitoringSettings(BaseSettings):
     class Config:
         env_prefix = "MONITORING_"
 
-    @validator("watch_directories")
+    @field_validator("watch_directories")
+    @classmethod
     def validate_directories(cls, v):
         """Validate watch directories."""
         validated = []
@@ -144,7 +148,8 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
         case_sensitive = False
 
-    @validator("data_dir")
+    @field_validator("data_dir")
+    @classmethod
     def validate_data_dir(cls, v):
         """Validate data directory path."""
         import os
