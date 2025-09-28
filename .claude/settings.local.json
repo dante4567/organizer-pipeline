@@ -39,7 +39,11 @@
       "Bash(env)",
       "Read(//nix/store/**)",
       "Bash(docker:*)",
-      "Bash(./local_dev.sh:*)"
+      "Bash(./local_dev.sh:*)",
+      "Bash(ssh:*)",
+      "Bash(git pull:*)",
+      "Bash(export:*)",
+      "Bash(git config:*)"
     ],
     "deny": [],
     "ask": []
