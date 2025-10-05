@@ -2,7 +2,7 @@
 Secure LLM providers with proper async/await and error handling.
 """
 
-from .base import BaseLLMProvider, LLMResponse, LLMError
+from .base import BaseLLMProvider, LLMResponse, LLMError, LLMErrorType
 from .openai_provider import OpenAIProvider
 from .anthropic_provider import AnthropicProvider
 from .ollama_provider import OllamaProvider
@@ -13,6 +13,7 @@ __all__ = [
     "BaseLLMProvider",
     "LLMResponse",
     "LLMError",
+    "LLMErrorType",
     "OpenAIProvider",
     "AnthropicProvider",
     "OllamaProvider",

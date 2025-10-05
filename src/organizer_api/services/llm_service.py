@@ -35,19 +35,19 @@ class LLMService:
         except Exception as e:
             logger.error(f"Failed to initialize LLM service: {e}")
             # Fall back to demo provider
-            self.provider = create_llm_provider(\"demo\", {\"model\": \"demo\"})
-            logger.info(\"Falling back to demo provider\")
+            self.provider = create_llm_provider("demo", {"model": "demo"})
+            logger.info("Falling back to demo provider")
 
-    async def process_user_input(self, user_input: str, system_prompt: str = \"\",
+    async def process_user_input(self, user_input: str, system_prompt: str = "",
                                context: Dict[str, Any] = None) -> LLMResponse:
-        \"\"\"
+        """
         Process user input and return appropriate response.
 
         This method analyzes user input to determine intent and provides
         contextual responses for calendar, task, and contact management.
-        \"\"\"
+        """
         if not self.provider:
-            raise RuntimeError(\"LLM service not initialized\")
+            raise RuntimeError("LLM service not initialized")
 
         context = context or {}
 
@@ -65,26 +65,26 @@ class LLMService:
 
         return response
 
-    def _create_system_prompt(self, additional_prompt: str = \"\") -> str:
-        \"\"\"Create comprehensive system prompt for the organizer assistant.\"\"\"
-        base_prompt = \"\"\"You are a helpful personal organizer assistant. You can help users with:
+    def _create_system_prompt(self, additional_prompt: str = "") -> str:
+        """Create comprehensive system prompt for the organizer assistant."""
+        base_prompt = """You are a helpful personal organizer assistant. You can help users with:
 
 📅 CALENDAR MANAGEMENT:
 - Creating, updating, and managing calendar events
 - Scheduling meetings and appointments
 - Setting reminders and notifications
-- Example: \"Meeting with John tomorrow at 3pm in conference room A\"
+- Example: "Meeting with John tomorrow at 3pm in conference room A"
 
 ✅ TASK MANAGEMENT:
 - Creating and organizing todo items
 - Setting priorities and due dates
 - Tracking task completion
-- Example: \"Remind me to call the bank next Friday, high priority\"
+- Example: "Remind me to call the bank next Friday, high priority"
 
 📇 CONTACT MANAGEMENT:
 - Adding and updating contact information
 - Managing contact details and relationships
-- Example: \"Add Sarah Johnson, email sarah@company.com, phone 555-0123\"
+- Example: "Add Sarah Johnson, email sarah@company.com, phone 555-0123"
 
 📊 INSIGHTS & SUMMARIES:
 - Providing daily/weekly summaries
@@ -96,27 +96,27 @@ IMPORTANT GUIDELINES:
 - Ask for clarification when needed
 - Confirm actions before creating items
 - Use natural, conversational language
-- Respect user privacy and data security\"\"\"
+- Respect user privacy and data security"""
 
         if additional_prompt:
-            return f\"{base_prompt}\\n\\nAdditional context: {additional_prompt}\"
+            return f"{base_prompt}\n\nAdditional context: {additional_prompt}"
 
         return base_prompt
 
     def _analyze_response_for_actions(self, user_input: str, response: str,
                                     context: Dict[str, Any]) -> None:
-        \"\"\"
+        """
         Analyze the response to extract actionable items.
 
         This method identifies patterns in user input that suggest
         calendar events, tasks, or contacts should be created.
-        \"\"\"
+        """
         user_lower = user_input.lower()
 
         # Calendar event patterns
         calendar_patterns = [
-            r'meeting.*(?:tomorrow|next week|on \\w+day)',
-            r'appointment.*(?:at \\d+[:\\.]?\\d*\\s*(?:am|pm)?)',
+            r'meeting.*(?:tomorrow|next week|on \w+day)',
+            r'appointment.*(?:at \d+[:.]?\d*\s*(?:am|pm)?)',
             r'schedule.*(?:with|for)',
             r'(?:call|lunch|dinner).*(?:at|on|tomorrow)'
         ]
@@ -126,7 +126,7 @@ IMPORTANT GUIDELINES:
             r'remind me.*(?:to|about)',
             r'todo.*',
             r'need to.*',
-            r'don\\'t forget.*'
+            r'don\'t forget.*'
         ]
 
         # Contact patterns
@@ -154,27 +154,27 @@ IMPORTANT GUIDELINES:
                 break
 
         if actions_found:
-            logger.info(f\"Detected potential actions in user input: {actions_found}\")
+            logger.info(f"Detected potential actions in user input: {actions_found}")
             context['suggested_actions'] = actions_found
 
     async def health_check(self) -> bool:
-        \"\"\"Check if the LLM service is healthy.\"\"\"
+        """Check if the LLM service is healthy."""
         if not self.provider:
             return False
 
         try:
             return await self.provider.health_check()
         except Exception as e:
-            logger.error(f\"LLM health check failed: {e}\")
+            logger.error(f"LLM health check failed: {e}")
             return False
 
     def get_current_provider_info(self) -> Dict[str, Any]:
-        \"\"\"Get information about the current provider.\"\"\"
+        """Get information about the current provider."""
         if not self.provider:
-            return {\"provider\": \"none\", \"status\": \"not_initialized\"}
+            return {"provider": "none", "status": "not_initialized"}
 
         return self.provider.get_info()
 
     def get_available_providers(self) -> Dict[str, str]:
-        \"\"\"Get list of available providers.\"\"\"
+        """Get list of available providers."""
         return get_available_providers()
