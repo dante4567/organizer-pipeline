@@ -49,7 +49,8 @@
       "Bash(sqlite3:*)",
       "Bash(SECURITY_SECRET_KEY=\"dev-secret-key-change-in-production-must-be-32-chars-min\" LLM_PROVIDER=\"demo\" LLM_MODEL=\"demo\" DEBUG=\"true\" python3 -m uvicorn organizer_api.main:app --host 127.0.0.1 --port 8000)",
       "Bash(./test_api.sh:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(streamlit run:*)"
     ],
     "deny": [],
     "ask": []
